@@ -26,8 +26,10 @@
     <section id="search">
       <div class="engine-bar" id="engine-bar"></div>
       <div class="search-row">
-        <input id="search-input" type="text" placeholder="输入关键词，回车搜索" autocomplete="off" autofocus>
+        <input id="search-input" type="text" placeholder="输入关键词，回车搜索" autocomplete="off" autofocus
+               role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="search-suggest">
         <button id="search-go" type="button" title="搜索">搜索</button>
+        <div class="search-suggest" id="search-suggest" role="listbox" hidden></div>
       </div>
     </section>
 
@@ -86,6 +88,7 @@
           <label class="btn-like">导入 JSON
             <input type="file" id="config-import" accept="application/json,.json">
           </label>
+          <button type="button" id="history-clear">清空搜索历史</button>
         </div>
       </section>
 

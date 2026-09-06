@@ -21,8 +21,10 @@
     <section id="search">
       <div class="engine-bar" id="engine-bar"></div>
       <div class="search-row">
-        <input id="search-input" type="text" placeholder="输入关键词，回车搜索" autocomplete="off">
+        <input id="search-input" type="text" placeholder="输入关键词，回车搜索" autocomplete="off"
+               role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="search-suggest">
         <button id="search-go" type="button" title="搜索">搜索</button>
+        <div class="search-suggest" id="search-suggest" role="listbox" hidden></div>
       </div>
     </section>
     <section id="bookmarks">
@@ -70,6 +72,7 @@
           <label class="btn-like">导入 JSON
             <input type="file" id="config-import" accept="application/json,.json">
           </label>
+          <button type="button" id="history-clear">清空搜索历史</button>
         </div>
       </section>
       <div class="modal-actions">
@@ -362,6 +365,80 @@
     // -- empty search must not navigate --
     window.mtab.dispatch({ type: 'search_submit', query: '   ' });
     check('empty keyword does not navigate', location.href.includes('test-harness'));
+
+    // -- search history suggestions (search-history change) --
+    // NOTE: real search_submit triggers open_url navigation, which would
+    // leave the harness page. Seed history through config_import instead
+    // (a valid persisted-config shape), then exercise the non-navigating
+    // paths: focus/input/keyboard-highlight/Esc/delete/clear.
+    const suggestBox = $('search-suggest');
+    const suggestItems = () => [...suggestBox.querySelectorAll('.suggest-item')];
+    const typeQuery = async q => {
+      $('search-input').value = q;
+      $('search-input').dispatchEvent(new Event('input', { bubbles: true }));
+      await tick();
+    };
+    const cfgWithHistory = JSON.parse(JSON.stringify(window.mtab.config));
+    cfgWithHistory.search.history = [
+      { query: 'moonbit 入门', count: 3, lastUsedMs: 3000 },
+      { query: 'mooncake 食谱', count: 1, lastUsedMs: 4000 },
+      { query: '农历 节气', count: 2, lastUsedMs: 5000 },
+    ];
+    window.mtab.dispatch({ type: 'config_import', json: JSON.stringify(cfgWithHistory) });
+    await tick();
+    check('imported history persisted',
+      JSON.parse(localStorage.getItem('mtab.config')).search.history.length === 3);
+    // focus on empty input -> recent 6, newest first
+    $('search-input').value = '';
+    $('search-input').dispatchEvent(new Event('focus'));
+    await tick();
+    check('focus on empty input shows recent history',
+      !suggestBox.hidden && suggestItems().length === 3 &&
+      suggestItems()[0].dataset.query === '农历 节气',
+      suggestItems().map(i => i.dataset.query));
+    // typed prefix filter (case-insensitive)
+    await typeQuery('MOON');
+    check('typed prefix filters case-insensitively',
+      suggestItems().map(i => i.dataset.query).join(',') === 'mooncake 食谱,moonbit 入门',
+      suggestItems().map(i => i.dataset.query));
+    // no match -> dropdown hidden
+    await typeQuery('zzz');
+    check('no matching prefix hides dropdown',
+      suggestBox.hidden || suggestItems().length === 0);
+    // keyboard: ArrowDown highlights first entry
+    await typeQuery('moon');
+    $('search-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    check('arrow-down highlights first entry',
+      suggestItems()[0].classList.contains('active') &&
+      suggestItems()[0].getAttribute('aria-selected') === 'true');
+    // Esc closes, input untouched
+    $('search-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    check('escape closes suggestions, input preserved',
+      suggestBox.hidden && $('search-input').value === 'moon');
+    // single-entry delete via the x button (mousedown delegation)
+    $('search-input').dispatchEvent(new Event('focus'));
+    await tick();
+    const victim = suggestItems()[0].dataset.query;
+    suggestItems()[0].querySelector('.suggest-del').dispatchEvent(
+      new Event('mousedown', { bubbles: true, cancelable: true }));
+    await until(() => !window.mtab.config.search.history.some(h => h.query === victim));
+    check('single delete removes entry from history',
+      !window.mtab.config.search.history.some(h => h.query === victim),
+      window.mtab.config.search.history.map(h => h.query));
+    // clear all via settings button
+    $('settings-open').click();
+    $('history-clear').click();
+    await tick();
+    check('history clear empties store',
+      window.mtab.config.search.history.length === 0);
+    check('history clear persisted',
+      JSON.parse(localStorage.getItem('mtab.config')).search.history.length === 0);
+    $('toast').hidden = true;
+    $('settings-close').click();
+    $('search-input').dispatchEvent(new Event('focus'));
+    await tick();
+    check('focus after clear shows no suggestions',
+      suggestBox.hidden || suggestItems().length === 0);
 
     // -- widget toggle via settings --
     $('settings-open').click();

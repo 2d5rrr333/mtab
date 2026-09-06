@@ -28,6 +28,7 @@ async function loadWasm() {
 const wasm = await loadWasm();
 let config = null; // current state.config
 let clockView = null; // current state.clock
+let suggestions = []; // current state.suggestions (transient view)
 let editingBookmarkId = null; // bookmark form mode
 
 function todayStr() {
@@ -39,8 +40,27 @@ function todayStr() {
 function apply(response) {
   config = response.state.config;
   clockView = response.state.clock;
+  const prevSuggestions = suggestions;
+  suggestions = response.state.suggestions || [];
   runEffects(response.effects);
   renderAll();
+  // the suggestion dropdown is its own partition: re-render only when the
+  // suggestion list actually changed (bookmark events must not touch it)
+  if (suggestions !== prevSuggestions && suggestionsChanged(prevSuggestions, suggestions)) {
+    renderSuggestions();
+  }
+}
+
+function suggestionsChanged(a, b) {
+  if (a.length !== b.length) {
+    return true;
+  }
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].query !== b[i].query || a[i].count !== b[i].count) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function dispatch(event) {
@@ -133,7 +153,77 @@ function renderEngineBar() {
 
 function submitSearch() {
   const input = document.getElementById('search-input');
-  dispatch({ type: 'search_submit', query: input.value });
+  dispatch({ type: 'search_submit', query: input.value, at: Date.now() });
+  hideSuggestions();
+}
+
+// suggestions: transient view partition (search-history design D3/D6).
+// The input element itself is never re-rendered; only the dropdown is.
+let suggestIndex = -1; // highlighted entry, -1 = none (shell-local UI state)
+
+function renderSuggestions() {
+  const box = document.getElementById('search-suggest');
+  box.replaceChildren();
+  const list = suggestions || [];
+  const input = document.getElementById('search-input');
+  input.setAttribute('aria-expanded', String(list.length > 0));
+  if (list.length === 0) {
+    box.hidden = true;
+    suggestIndex = -1;
+    return;
+  }
+  let idx = 0;
+  for (const entry of list) {
+    const i = idx++;
+    const item = document.createElement('div');
+    item.className = 'suggest-item';
+    item.setAttribute('role', 'option');
+    item.dataset.query = entry.query;
+    item.dataset.index = String(i);
+    const text = document.createElement('span');
+    text.className = 'suggest-text';
+    text.textContent = entry.query;
+    item.appendChild(text);
+    const count = document.createElement('span');
+    count.className = 'suggest-count';
+    count.textContent = `×${entry.count}`;
+    item.appendChild(count);
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'suggest-del';
+    del.title = '删除该条历史';
+    del.textContent = '✕';
+    item.appendChild(del);
+    box.appendChild(item);
+  }
+  suggestIndex = -1; // fresh render resets highlight (design D6)
+  box.hidden = false;
+}
+
+function hideSuggestions() {
+  const box = document.getElementById('search-suggest');
+  box.hidden = true;
+  suggestIndex = -1;
+  document.getElementById('search-input').setAttribute('aria-expanded', 'false');
+}
+
+function highlightedQuery() {
+  const box = document.getElementById('search-suggest');
+  const el = box.querySelector(`.suggest-item[data-index="${suggestIndex}"]`);
+  return el ? el.dataset.query : null;
+}
+
+function moveHighlight(delta) {
+  const box = document.getElementById('search-suggest');
+  const items = [...box.querySelectorAll('.suggest-item')];
+  if (items.length === 0) {
+    return;
+  }
+  suggestIndex = Math.min(items.length - 1, Math.max(-1, suggestIndex + delta));
+  for (let el of items) {
+    el.classList.toggle('active', Number(el.dataset.index) === suggestIndex);
+    el.setAttribute('aria-selected', String(Number(el.dataset.index) === suggestIndex));
+  }
 }
 
 // bookmarks: grid rebuilt on data change, interactions via delegation
@@ -224,12 +314,16 @@ function applyWallpaper() {
   currentWallpaperImage = image;
   const img = new Image();
   img.src = image;
-  img.decode().then(
-    () => revealWallpaper(image, request),
-    // decode failed (broken data url): apply anyway, "takes effect
-    // immediately" must not be blocked (ui-a11y-polish D1 degrade path)
-    () => revealWallpaper(image, request),
+  // decode (or its failure) settles the fade; a timeout guards against
+  // environments where decode never completes (headless virtual time)
+  // and against unreasonably slow decodes blocking "takes effect
+  // immediately" (configuration spec). Same reveal path either way.
+  const decoded = img.decode().then(
+    () => {},
+    () => {},
   );
+  const timeout = new Promise(resolve => setTimeout(resolve, 800));
+  Promise.race([decoded, timeout]).then(() => revealWallpaper(image, request));
 }
 
 function revealWallpaper(image, request) {
@@ -341,12 +435,55 @@ function importConfig(file) {
 
 function wireEvents() {
   // search
-  document.getElementById('search-input').addEventListener('keydown', e => {
+  const input = document.getElementById('search-input');
+  input.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
-      submitSearch();
+      const picked = highlightedQuery();
+      if (picked !== null) {
+        dispatch({ type: 'search_submit', query: picked, at: Date.now() });
+        hideSuggestions();
+      } else {
+        submitSearch();
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveHighlight(1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveHighlight(-1);
+    } else if (e.key === 'Escape') {
+      hideSuggestions();
     }
   });
+  input.addEventListener('input', () => {
+    dispatch({ type: 'search_input', query: input.value, at: Date.now() });
+  });
+  input.addEventListener('focus', () => {
+    dispatch({ type: 'search_input', query: input.value, at: Date.now() });
+  });
   document.getElementById('search-go').addEventListener('click', submitSearch);
+
+  // suggestion dropdown: delegated clicks (pick entry / delete one)
+  document.getElementById('search-suggest').addEventListener('mousedown', e => {
+    e.preventDefault(); // keep input focus
+    const item = e.target.closest('.suggest-item');
+    if (!item) {
+      return;
+    }
+    if (e.target.closest('.suggest-del')) {
+      dispatch({ type: 'history_delete', query: item.dataset.query });
+      return;
+    }
+    input.value = item.dataset.query;
+    dispatch({ type: 'search_submit', query: item.dataset.query, at: Date.now() });
+    hideSuggestions();
+  });
+  // click outside closes the dropdown
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#search')) {
+      hideSuggestions();
+    }
+  });
 
   // bookmark grid: event delegation (design D5)
   const grid = document.getElementById('bm-grid');
@@ -423,6 +560,10 @@ function wireEvents() {
 
   // settings: import / export
   document.getElementById('config-export').addEventListener('click', exportConfig);
+  document.getElementById('history-clear').addEventListener('click', () => {
+    dispatch({ type: 'history_clear' });
+    toast('已清空搜索历史', 'success');
+  });
   document.getElementById('config-import').addEventListener('change', e => {
     const file = e.target.files[0];
     e.target.value = '';

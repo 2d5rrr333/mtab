@@ -71,6 +71,7 @@ pub fn Config::default() -> Config {
         },
       ],
       current: "baidu",
+      history: [],
     },
     widgets: { clock: true, bookmarks: true, },
     wallpaper: Builtin("w1"),

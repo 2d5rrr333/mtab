@@ -8,6 +8,10 @@ import {
 }
 
 // Values
+pub const HISTORY_LIMIT : Int = 100
+
+pub const SUGGESTION_LIMIT : Int = 6
+
 pub fn open(String?, String) -> Response
 
 pub fn update(Store, Event) -> Response
@@ -32,7 +36,10 @@ pub(all) enum Event {
   BookmarkEdit(id~ : String, name~ : String, url~ : String)
   BookmarkDelete(id~ : String)
   EngineSelect(id~ : String)
-  SearchSubmit(query~ : String)
+  SearchInput(query~ : String, at~ : Int64?)
+  SearchSubmit(query~ : String, at~ : Int64?)
+  HistoryDelete(query~ : String)
+  HistoryClear
   WidgetToggle(widget~ : String)
   WallpaperSetBuiltin(id~ : String)
   WallpaperSetCustom(data~ : String)
@@ -49,6 +56,7 @@ pub(all) struct Response {
 pub(all) struct Store {
   config : @model.Config
   clock : ClockView?
+  suggestions : Array[@model.HistoryEntry]
 } derive(Eq, ToJson, @debug.Debug)
 
 // Type aliases

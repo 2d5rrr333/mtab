@@ -13,6 +13,8 @@ pub fn expect_object(Json, @json.JsonPath) -> Map[String, Json] raise @json.Json
 
 pub fn normalize_url(String) -> String?
 
+pub fn number_field_opt(Map[String, Json], String) -> Int64?
+
 pub fn str_field(Map[String, Json], String, @json.JsonPath) -> String raise @json.JsonDecodeError
 
 // Errors
@@ -47,9 +49,19 @@ pub(all) struct Engine {
 pub impl ToJson for Engine
 pub impl @json.FromJson for Engine
 
+pub(all) struct HistoryEntry {
+  query : String
+  count : Int
+  last_used_ms : Int64
+} derive(Eq, @debug.Debug)
+pub fn HistoryEntry::score(Self, now_ms~ : Int64) -> Double
+pub impl ToJson for HistoryEntry
+pub impl @json.FromJson for HistoryEntry
+
 pub(all) struct SearchConfig {
   engines : Array[Engine]
   current : String
+  history : Array[HistoryEntry]
 } derive(Eq, @debug.Debug)
 pub impl ToJson for SearchConfig
 pub impl @json.FromJson for SearchConfig

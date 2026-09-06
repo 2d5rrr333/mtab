@@ -51,6 +51,31 @@ fn int_field(
 }
 
 ///|
+/// Integer-milliseconds field decoded as Int64: JSON numbers arrive as
+/// Double; epoch-ms values stay far below 2^53 so the round trip is exact.
+fn int64_field(
+  map : Map[String, Json],
+  key : String,
+  path : @json.JsonPath,
+) -> Int64 raise @json.JsonDecodeError {
+  match field(map, key, path) {
+    Number(n, ..) => n.to_int64()
+    _ =>
+      raise @json.JsonDecodeError((path, "field " + key + " must be a number"))
+  }
+}
+
+///|
+/// Optional numeric field: absent or non-number -> None. Lets bridge events
+/// carry optional epoch-ms timestamps without a required-field decode path.
+pub fn number_field_opt(map : Map[String, Json], key : String) -> Int64? {
+  match map.get(key) {
+    Some(Number(n, ..)) => Some(n.to_int64())
+    _ => None
+  }
+}
+
+///|
 fn bool_field(
   map : Map[String, Json],
   key : String,

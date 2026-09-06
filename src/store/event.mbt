@@ -7,13 +7,23 @@ pub(all) enum Event {
   BookmarkEdit(id~ : String, name~ : String, url~ : String)
   BookmarkDelete(id~ : String)
   EngineSelect(id~ : String)
-  SearchSubmit(query~ : String)
+  SearchInput(query~ : String, at~ : Int64?)
+  SearchSubmit(query~ : String, at~ : Int64?)
+  HistoryDelete(query~ : String)
+  HistoryClear
   WidgetToggle(widget~ : String)
   WallpaperSetBuiltin(id~ : String)
   WallpaperSetCustom(data~ : String)
   ConfigImport(json~ : String)
   TickDate(date~ : String)
 } derive(Eq, Debug)
+
+///|
+/// Optional epoch-ms "at" field: absent or non-number -> None. Old callers
+// (pre search-history) never send it; 0 is a valid "no decay" timestamp.
+fn at_field(map : Map[String, Json]) -> Int64? {
+  @model.number_field_opt(map, "at")
+}
 
 ///|
 pub impl FromJson for Event with fn from_json(
@@ -35,7 +45,13 @@ pub impl FromJson for Event with fn from_json(
       )
     "bookmark_delete" => BookmarkDelete(id=@model.str_field(map, "id", path))
     "engine_select" => EngineSelect(id=@model.str_field(map, "id", path))
-    "search_submit" => SearchSubmit(query=@model.str_field(map, "query", path))
+    "search_input" =>
+      SearchInput(query=@model.str_field(map, "query", path), at=at_field(map))
+    "search_submit" =>
+      SearchSubmit(query=@model.str_field(map, "query", path), at=at_field(map))
+    "history_delete" =>
+      HistoryDelete(query=@model.str_field(map, "query", path))
+    "history_clear" => HistoryClear
     "widget_toggle" =>
       WidgetToggle(widget=@model.str_field(map, "widget", path))
     "wallpaper_set_builtin" =>

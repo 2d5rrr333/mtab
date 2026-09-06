@@ -69,6 +69,51 @@ check('init leap month', r2.state.clock.lunar === '乙巳年闰六月初一', r2
 r = JSON.parse(mtab.mtab_dispatch('{"type":"config_import","json":"{{broken"}'));
 check('bad import notifies', r.effects[0].type === 'notify_error', r.effects);
 
+// -- search history (search-history change) --
+// input on empty query returns recent history: last submitted first
+r = JSON.parse(mtab.mtab_dispatch('{"type":"search_input","query":"","at":9000}'));
+check(
+  'empty input suggests most recent first',
+  r.state.suggestions.map(s => s.query).join(',') === 'moonbit 语言',
+  r.state.suggestions,
+);
+// prefix filter is case-insensitive
+r = JSON.parse(mtab.mtab_dispatch('{"type":"search_submit","query":"MoonBit 教程","at":9500}'));
+r = JSON.parse(mtab.mtab_dispatch('{"type":"search_input","query":"moonbit","at":9600}'));
+check(
+  'prefix filter is case-insensitive',
+  r.state.suggestions.map(s => s.query).join(',') === 'MoonBit 教程,moonbit 语言',
+  r.state.suggestions,
+);
+// repeat submit bumps count instead of duplicating
+r = JSON.parse(mtab.mtab_dispatch('{"type":"search_submit","query":"MoonBit 教程","at":9700}'));
+const hist = r.state.config.search.history;
+check(
+  'repeat submit bumps count',
+  hist.length === 2 &&
+    hist.find(h => h.query === 'MoonBit 教程').count === 2 &&
+    hist.find(h => h.query === 'MoonBit 教程').lastUsedMs === 9700,
+  hist,
+);
+// single delete removes only that entry
+r = JSON.parse(mtab.mtab_dispatch('{"type":"history_delete","query":"moonbit 语言"}'));
+check(
+  'history_delete removes the entry',
+  r.state.config.search.history.map(h => h.query).join(',') === 'MoonBit 教程',
+  r.state.config.search.history,
+);
+// clear empties everything and persists
+r = JSON.parse(mtab.mtab_dispatch('{"type":"history_clear"}'));
+check(
+  'history_clear empties history and suggests nothing',
+  r.state.config.search.history.length === 0 && r.state.suggestions.length === 0,
+  r.state,
+);
+// old config (no history field) imports cleanly with empty history
+const legacy = JSON.stringify({ version: 1, bookmarks: [], search: { engines: [], current: 'baidu' }, widgets: { clock: true, bookmarks: true }, wallpaper: { type: 'builtin', id: 'w1' } });
+r = JSON.parse(mtab.mtab_dispatch(`{"type":"config_import","json":${JSON.stringify(legacy)}}`));
+check('legacy config imports with empty history', r.state.config.search.history.length === 0, r.state.config.search);
+
 // -- unknown event --
 r = JSON.parse(mtab.mtab_dispatch('{"type":"nope"}'));
 check('unknown event notifies', r.effects[0].type === 'notify_error', r.effects);

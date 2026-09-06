@@ -1,0 +1,26 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2d5rrr333/mtab/trie"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+type Node derive(@debug.Debug)
+
+pub struct Trie {
+  nodes : Array[Node]
+  mut size : Int
+} derive(@debug.Debug)
+pub fn Trie::insert(Self, String, String) -> Unit
+pub fn Trie::new() -> Self
+pub fn Trie::prefix_query(Self, String) -> Array[String]
+pub fn Trie::remove(Self, String, String) -> Bool
+
+// Type aliases
+
+// Traits

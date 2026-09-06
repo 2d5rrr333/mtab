@@ -1,0 +1,2 @@
+// Package trie: a character-level prefix trie (search-history design D4).
+// Pure data structure, no FFI, reusable beyond search history.

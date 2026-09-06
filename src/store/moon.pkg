@@ -4,6 +4,7 @@
 import {
   "2d5rrr333/mtab/model",
   "2d5rrr333/mtab/lunar",
+  "2d5rrr333/mtab/trie",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
 }

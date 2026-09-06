@@ -9,10 +9,13 @@ pub(all) struct ClockView {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// Full state exposed over the bridge: the config plus the derived clock.
+/// Full state exposed over the bridge: the config, the derived clock, and
+/// the transient search suggestions (never persisted; recomputed on
+/// history-relevant events, carried along otherwise).
 pub(all) struct Store {
   config : @model.Config
   clock : ClockView?
+  suggestions : Array[@model.HistoryEntry]
 } derive(Eq, Debug, ToJson)
 
 ///|
@@ -34,7 +37,14 @@ pub fn open(stored : String?, today : String) -> Response {
       }
     None => @model.Config::default()
   }
-  respond({ config, clock: clock_view_for(today), }, [])
+  respond(
+    {
+      config,
+      clock: clock_view_for(today),
+      suggestions: recent_suggestions(config.search.history),
+    },
+    [],
+  )
 }
 
 ///|
@@ -114,12 +124,26 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
       } else {
         (store, [NotifyError(message="未知的搜索引擎")])
       }
-    SearchSubmit(query~) => {
+    SearchInput(query~, at~) => {
+      // Pure view update: never persists. Empty query -> most recent 6.
+      let now = match at {
+        Some(t) => t
+        None => 0L
+      }
+      let suggestions = suggest_for(store.config.search.history, query, now)
+      ({ ..store, suggestions, }, [])
+    }
+    SearchSubmit(query~, at~) => {
       let q = query.trim().to_owned()
       if q == "" {
         // search-box spec: empty keyword must not navigate.
         (store, [])
       } else {
+        let now = match at {
+          Some(t) => t
+          None => 0L
+        }
+        let history = record_search(store.config.search.history, q, now)
         let current = store.config.search.current
         let mut found : @model.Engine? = None
         for e in store.config.search.engines {
@@ -128,12 +152,59 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
           }
         }
         match found {
-          Some(engine) =>
-            (store, [OpenUrl(url=build_search_url(engine.url_template, q))])
-          None => (store, [NotifyError(message="未找到当前搜索引擎")])
+          Some(engine) => {
+            let next = {
+              ..store,
+              config: {
+                ..store.config,
+                search: { ..store.config.search, history, },
+              },
+              // post-submit suggestions reflect the fresh history entry
+              suggestions: suggest_for(history, q, now),
+            }
+            (next, [OpenUrl(url=build_search_url(engine.url_template, q))])
+          }
+          None =>
+            // engine missing: still record the search (it was user intent)
+            (
+              {
+                ..store,
+                config: {
+                  ..store.config,
+                  search: { ..store.config.search, history, },
+                },
+              },
+              [NotifyError(message="未找到当前搜索引擎")],
+            )
         }
       }
     }
+    HistoryDelete(query~) => {
+      let history = store.config.search.history.filter(e => e.query != query)
+      (
+        {
+          ..store,
+          config: {
+            ..store.config,
+            search: { ..store.config.search, history, },
+          },
+          suggestions: suggest_for(history, query, 0L),
+        },
+        [Save],
+      )
+    }
+    HistoryClear =>
+      (
+        {
+          ..store,
+          config: {
+            ..store.config,
+            search: { ..store.config.search, history: [], },
+          },
+          suggestions: [],
+        },
+        [Save],
+      )
     WidgetToggle(widget~) => {
       let widgets = store.config.widgets
       match widget {
@@ -182,7 +253,14 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
       try {
         let cfg = @model.Config::decode(json)
         if cfg.version == @model.CONFIG_VERSION {
-          ({ config: cfg, clock: store.clock, }, [Save])
+          (
+            {
+              config: cfg,
+              clock: store.clock,
+              suggestions: recent_suggestions(cfg.search.history),
+            },
+            [Save],
+          )
         } else {
           (
             store,

@@ -110,7 +110,7 @@ test "engine_select switches the current engine and saves" {
 test "search_submit builds the engine url for the current engine" {
   let base = @store.open(None, "2025-01-29").state
   // Default engine is baidu.
-  let resp = @store.update(base, SearchSubmit(query="moonbit 语言"))
+  let resp = @store.update(base, SearchSubmit(query="moonbit 语言", at=None))
   assert_eq(resp.effects, [
     OpenUrl(url="https://www.baidu.com/s?wd=moonbit%20%E8%AF%AD%E8%A8%80"),
   ])
@@ -120,7 +120,7 @@ test "search_submit builds the engine url for the current engine" {
 test "search_submit uses the selected engine after a switch" {
   let base = @store.open(None, "2025-01-29").state
   let switched = @store.update(base, EngineSelect(id="google")).state
-  let resp = @store.update(switched, SearchSubmit(query="moonbit"))
+  let resp = @store.update(switched, SearchSubmit(query="moonbit", at=None))
   assert_eq(resp.effects, [
     OpenUrl(url="https://www.google.com/search?q=moonbit"),
   ])
@@ -129,7 +129,7 @@ test "search_submit uses the selected engine after a switch" {
 ///|
 test "search_submit with an empty keyword does nothing" {
   let base = @store.open(None, "2025-01-29").state
-  let resp = @store.update(base, SearchSubmit(query="   "))
+  let resp = @store.update(base, SearchSubmit(query="   ", at=None))
   assert_eq(resp.effects, [])
 }
 
