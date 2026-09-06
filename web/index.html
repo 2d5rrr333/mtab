@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1c1e26">
+  <title>mtab · MoonBit 导航页</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- wallpaper crossfade layers (design D4) -->
+  <div id="wallpaper-a" class="wallpaper-layer"></div>
+  <div id="wallpaper-b" class="wallpaper-layer"></div>
+  <!-- readability scrim above wallpaper, below content (design D3) -->
+  <div id="scrim"></div>
+
+  <main id="app">
+    <!-- clock widget (design D5 partition) -->
+    <header id="clock" class="widget">
+      <div class="time" id="clock-time">--:--:--</div>
+      <div class="date-line" id="clock-date"></div>
+    </header>
+
+    <!-- search box: always-on base component -->
+    <section id="search">
+      <div class="engine-bar" id="engine-bar"></div>
+      <div class="search-row">
+        <input id="search-input" type="text" placeholder="输入关键词，回车搜索" autocomplete="off" autofocus>
+        <button id="search-go" type="button" title="搜索">搜索</button>
+      </div>
+    </section>
+
+    <!-- bookmark grid -->
+    <section id="bookmarks">
+      <div class="bm-grid" id="bm-grid"></div>
+      <div class="bm-empty" id="bm-empty" hidden>
+        还没有书签。点击下方「添加书签」开始收藏常用站点。
+      </div>
+    </section>
+
+    <!-- toolbar -->
+    <div class="toolbar">
+      <button id="bm-add" type="button">添加书签</button>
+      <button id="settings-open" type="button">设置</button>
+    </div>
+  </main>
+
+  <!-- bookmark add/edit form (modal) -->
+  <div class="modal-backdrop" id="bm-modal" hidden>
+    <form class="modal" id="bm-form">
+      <h3 id="bm-form-title">添加书签</h3>
+      <label>名称<input name="name" type="text" placeholder="站点名称（留空则使用网址）"></label>
+      <label>网址<input name="url" type="text" placeholder="example.com" required></label>
+      <p class="form-error" id="bm-form-error" hidden></p>
+      <div class="modal-actions">
+        <button type="submit">保存</button>
+        <button type="button" id="bm-cancel">取消</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- settings panel -->
+  <div class="modal-backdrop" id="settings-modal" hidden>
+    <div class="modal settings">
+      <h3>设置</h3>
+
+      <section>
+        <h4>小组件</h4>
+        <label><input type="checkbox" id="toggle-clock"> 时钟</label>
+        <label><input type="checkbox" id="toggle-bookmarks"> 书签网格</label>
+      </section>
+
+      <section>
+        <h4>壁纸</h4>
+        <div class="wallpaper-list" id="wallpaper-list"></div>
+        <label class="upload-label">上传本地图片（长边压缩至 1920px）
+          <input type="file" id="wallpaper-upload" accept="image/*">
+        </label>
+      </section>
+
+      <section>
+        <h4>配置</h4>
+        <div class="config-actions">
+          <button type="button" id="config-export">导出 JSON</button>
+          <label class="btn-like">导入 JSON
+            <input type="file" id="config-import" accept="application/json,.json">
+          </label>
+        </div>
+      </section>
+
+      <div class="modal-actions">
+        <button type="button" id="settings-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- error toast -->
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
