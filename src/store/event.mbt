@@ -3,9 +3,14 @@
 
 ///|
 pub(all) enum Event {
-  BookmarkAdd(name~ : String, url~ : String)
-  BookmarkEdit(id~ : String, name~ : String, url~ : String)
+  BookmarkAdd(name~ : String, url~ : String, group~ : String?)
+  BookmarkEdit(id~ : String, name~ : String, url~ : String, group~ : String?)
   BookmarkDelete(id~ : String)
+  BookmarkMove(id~ : String, to_group~ : String, to_index~ : Int)
+  GroupAdd(name~ : String)
+  GroupRename(id~ : String, name~ : String)
+  GroupDelete(id~ : String)
+  GroupMove(id~ : String, to_index~ : Int)
   EngineSelect(id~ : String)
   SearchInput(query~ : String, at~ : Int64?)
   SearchSubmit(query~ : String, at~ : Int64?)
@@ -17,6 +22,13 @@ pub(all) enum Event {
   ConfigImport(json~ : String)
   TickDate(date~ : String)
 } derive(Eq, Debug)
+
+///|
+/// Optional group target for bookmark add/edit: absent -> None (default
+/// group semantics live in the reducer).
+fn group_field(map : Map[String, Json]) -> String? {
+  @model.str_field_opt(map, "group")
+}
 
 ///|
 /// Optional epoch-ms "at" field: absent or non-number -> None. Old callers
@@ -36,14 +48,34 @@ pub impl FromJson for Event with fn from_json(
       BookmarkAdd(
         name=@model.str_field(map, "name", path),
         url=@model.str_field(map, "url", path),
+        group=group_field(map),
       )
     "bookmark_edit" =>
       BookmarkEdit(
         id=@model.str_field(map, "id", path),
         name=@model.str_field(map, "name", path),
         url=@model.str_field(map, "url", path),
+        group=group_field(map),
       )
     "bookmark_delete" => BookmarkDelete(id=@model.str_field(map, "id", path))
+    "bookmark_move" =>
+      BookmarkMove(
+        id=@model.str_field(map, "id", path),
+        to_group=@model.str_field(map, "to_group", path),
+        to_index=@model.int_field(map, "to_index", path),
+      )
+    "group_add" => GroupAdd(name=@model.str_field(map, "name", path))
+    "group_rename" =>
+      GroupRename(
+        id=@model.str_field(map, "id", path),
+        name=@model.str_field(map, "name", path),
+      )
+    "group_delete" => GroupDelete(id=@model.str_field(map, "id", path))
+    "group_move" =>
+      GroupMove(
+        id=@model.str_field(map, "id", path),
+        to_index=@model.int_field(map, "to_index", path),
+      )
     "engine_select" => EngineSelect(id=@model.str_field(map, "id", path))
     "search_input" =>
       SearchInput(query=@model.str_field(map, "query", path), at=at_field(map))

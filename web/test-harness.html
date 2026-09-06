@@ -28,7 +28,10 @@
       </div>
     </section>
     <section id="bookmarks">
-      <div class="bm-grid" id="bm-grid"></div>
+      <div class="bm-toolbar-row">
+        <button id="group-add" type="button" class="ghost-btn">新建分组</button>
+      </div>
+      <div id="bm-groups"></div>
       <div class="bm-empty" id="bm-empty" hidden>还没有书签。</div>
     </section>
     <div class="toolbar">
@@ -42,6 +45,7 @@
       <h3 id="bm-form-title">添加书签</h3>
       <label>名称<input name="name" type="text"></label>
       <label>网址<input name="url" type="text" required></label>
+      <label>分组<select name="group" id="bm-form-group"></select></label>
       <p class="form-error" id="bm-form-error" hidden></p>
       <div class="modal-actions">
         <button type="submit">保存</button>
@@ -113,7 +117,31 @@
       document.getElementById('test-results').appendChild(li);
     }
     const $ = id => document.getElementById(id);
-    const gridItems = () => [...document.querySelectorAll('#bm-grid .bookmark')];
+    const gridItems = () => [...document.querySelectorAll('.bm-group .bookmark')];
+    const groupSections = () => [...document.querySelectorAll('.bm-group')];
+    const groupState = () => window.mtab.config.groups;
+    const allBookmarkIds = () => groupState().flatMap(g => g.bookmarks.map(b => b.id));
+    // synthesize a full pointer drag over a card (bookmark-groups D3)
+    const pointerDrag = (el, dx, dy) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const opts = { bubbles: true, cancelable: true, button: 0, isPrimary: true, pointerId: 1 };
+      el.dispatchEvent(new PointerEvent('pointerdown', { ...opts, clientX: cx, clientY: cy }));
+      const steps = 6;
+      for (let i = 1; i <= steps; i++) {
+        document.dispatchEvent(new PointerEvent('pointermove', {
+          ...opts,
+          clientX: cx + (dx * i) / steps,
+          clientY: cy + (dy * i) / steps,
+        }));
+      }
+      document.dispatchEvent(new PointerEvent('pointerup', {
+        ...opts,
+        clientX: cx + dx,
+        clientY: cy + dy,
+      }));
+    };
     const activeWallpaper = () => window.mtab.wallpaperLayer();
     const ruleFor = selector => {
       for (const sheet of document.styleSheets) {
@@ -300,14 +328,14 @@
     await tick();
     check('bookmark appears in grid', gridItems().length === 1);
     check('grid resolves at least 6 columns with content',
-      cs($('bm-grid')).gridTemplateColumns.split(' ').filter(v => v !== '0px').length >= 6,
-      cs($('bm-grid')).gridTemplateColumns);
+      cs(document.querySelector('.bm-group .bm-grid')).gridTemplateColumns.split(' ').filter(v => v !== '0px').length >= 6,
+      cs(document.querySelector('.bm-group .bm-grid')).gridTemplateColumns);
     check('bookmark url normalized in title',
       gridItems()[0].title === 'https://example.com');
     const stored = JSON.parse(localStorage.getItem('mtab.config'));
     check('save effect persisted to localStorage',
-      stored.bookmarks.length === 1 &&
-      stored.bookmarks[0].url === 'https://example.com', stored);
+      stored.groups[0].bookmarks.length === 1 &&
+      stored.groups[0].bookmarks[0].url === 'https://example.com', stored);
 
     // -- bookmark icon fallback (bad favicon host) --
     // simulate by adding a bookmark with an unreachable icon: rely on onerror
@@ -318,8 +346,9 @@
     check('grid items render icon or fallback', hasImgOrFallback);
 
     // -- bookmark edit via form --
-    const firstId = window.mtab.config.bookmarks[0].id;
-    gridItems()[0].querySelector('.bm-edit').click();
+    const firstId = allBookmarkIds().find(id => id !== 'b2'); // the example one
+    const cardOf = id => gridItems().find(c => c.dataset.id === id);
+    cardOf(firstId).querySelector('.bm-edit').click();
     check('edit form opens with values', !$('bm-modal').hidden &&
       $('bm-form').elements.url.value === 'https://example.com');
     $('bm-form').elements.name.value = '改名了';
@@ -327,30 +356,94 @@
     $('bm-form').dispatchEvent(new Event('submit', { cancelable: true }));
     await tick();
     check('edit reflected in grid',
-      gridItems()[0].querySelector('.bm-name').textContent === '改名了');
+      cardOf(firstId).querySelector('.bm-name').textContent === '改名了');
 
     // -- invalid url via form -> notify (toast), no state change --
-    const beforeCount = window.mtab.config.bookmarks.length;
+    const beforeCount = allBookmarkIds().length;
     $('bm-add').click();
     $('bm-form').elements.url.value = 'not a url';
     $('bm-form').dispatchEvent(new Event('submit', { cancelable: true }));
     check('invalid url shows toast', !$('toast').hidden, $('toast').textContent);
-    check('invalid url not added', window.mtab.config.bookmarks.length === beforeCount);
+    check('invalid url not added', allBookmarkIds().length === beforeCount);
     $('toast').hidden = true;
 
     // -- bookmark click opens new tab --
-    gridItems()[0].click();
+    cardOf(firstId).click();
     check('bookmark click opens url in new tab',
       opened.includes('https://changed.example.com/path'), opened);
 
     // -- bookmark delete --
-    const idsBeforeDelete = window.mtab.config.bookmarks.map(b => b.id).join(',');
-    gridItems()[0].querySelector('.bm-delete').click();
+    const idsBeforeDelete = allBookmarkIds().join(',');
+    cardOf(firstId).querySelector('.bm-delete').click();
     await until(() => gridItems().length === beforeCount - 1);
     check('bookmark deleted from grid', gridItems().length === beforeCount - 1,
       { count: gridItems().length, beforeCount, idsBeforeDelete,
-        after: window.mtab.config.bookmarks.map(b => b.id).join(','),
+        after: allBookmarkIds().join(','),
         toast: $('toast').hidden ? null : $('toast').textContent });
+
+    // -- bookmark groups: lifecycle via real UI (bookmark-groups D4/D5) --
+    // add a group through the button (prompt is stubbed below)
+    const realPrompt = window.prompt;
+    window.prompt = () => '工作';
+    $('group-add').click();
+    await until(() => groupState().length === 2);
+    check('group added with name', groupState()[1].name === '工作');
+    // add a bookmark INTO that group via the form dropdown
+    $('bm-add').click();
+    $('bm-form').elements.name.value = '组内书签';
+    $('bm-form').elements.url.value = 'grouped.example.com';
+    $('bm-form').elements.group.value = groupState()[1].id;
+    $('bm-form').dispatchEvent(new Event('submit', { cancelable: true }));
+    await until(() => groupState()[1].bookmarks.length === 1);
+    check('add via dropdown lands in the named group',
+      groupState()[1].bookmarks[0].url === 'https://grouped.example.com');
+    // pointer drag: move that bookmark back to the default group
+    const g1card = groupSections()[1].querySelector('.bookmark');
+    const g0grid = groupSections()[0].querySelector('.bm-grid');
+    const g0rect = g0grid.getBoundingClientRect();
+    pointerDrag(g1card, 0, g0rect.top + 10 - g1card.getBoundingClientRect().top);
+    await until(() => groupState()[0].bookmarks.some(b => b.url === 'https://grouped.example.com'));
+    check('pointer drag moves bookmark across groups',
+      groupState()[1].bookmarks.length === 0 &&
+      groupState()[0].bookmarks.some(b => b.url === 'https://grouped.example.com'),
+      allBookmarkIds());
+    // pointer drag within the default group: move first card onto the last
+    const idsBeforeDrag = groupState()[0].bookmarks.map(b => b.id).join(',');
+    const cards0 = () => [...groupSections()[0].querySelectorAll('.bookmark')];
+    if (cards0().length >= 2) {
+      const last = cards0()[cards0().length - 1];
+      const lr = last.getBoundingClientRect();
+      pointerDrag(cards0()[0], lr.left + lr.width / 2 - cards0()[0].getBoundingClientRect().left, 0);
+      await tick();
+      check('pointer drag reorders within the group',
+        groupState()[0].bookmarks.map(b => b.id).join(',') !== idsBeforeDrag,
+        { before: idsBeforeDrag, after: groupState()[0].bookmarks.map(b => b.id).join(',') });
+    } else {
+      check('pointer drag reorders within the group (skipped: <2 cards)', true);
+    }
+    // sub-threshold movement must NOT trigger a move (click passthrough)
+    const orderBefore = allBookmarkIds().join(',');
+    const anyCard = cards0()[0];
+    pointerDrag(anyCard, 1, 1);
+    await tick();
+    check('tiny pointer movement does not reorder',
+      allBookmarkIds().join(',') === orderBefore);
+    // rename the group via its header button
+    window.prompt = () => '学习';
+    groupSections()[1].querySelector('.bm-group-rename').click();
+    await until(() => groupState()[1].name === '学习');
+    check('group renamed', groupState()[1].name === '学习');
+    // delete the group: its bookmarks (none now) fall back — with one left
+    // put a bookmark back into g1 first via dispatch, then delete
+    const g1id = groupState()[1].id;
+    window.mtab.dispatch({ type: 'bookmark_move', id: groupState()[0].bookmarks[0].id, to_group: g1id, to_index: 0 });
+    await until(() => groupState()[1].bookmarks.length === 1);
+    groupSections()[1].querySelector('.bm-group-del').click();
+    await until(() => groupState().length === 1);
+    check('group delete falls bookmarks back into g0',
+      groupState()[0].bookmarks.length >= 1,
+      allBookmarkIds());
+    window.prompt = realPrompt;
 
     // -- engine switch via click --
     const bingBtn = [...document.querySelectorAll('#engine-bar button')]
@@ -553,18 +646,21 @@
       $('toast').textContent);
 
     // -- import through the real file input --
+    // v1-shaped file (flat bookmarks) exercises the migration path
     const exportNow = JSON.stringify(window.mtab.config);
     const modified = JSON.parse(exportNow);
+    modified.version = 1;
     modified.widgets.clock = false;
     modified.bookmarks = [{ id: 'bx', name: '导入的', url: 'https://imported.example.com' }];
+    delete modified.groups;
     const cfgFile = new File([JSON.stringify(modified)], 'cfg.json', { type: 'application/json' });
     const dt3 = new DataTransfer();
     dt3.items.add(cfgFile);
     $('config-import').files = dt3.files;
     $('config-import').dispatchEvent(new Event('change'));
-    await until(() => window.mtab.config.bookmarks.length === 1 &&
-      window.mtab.config.bookmarks[0].name === '导入的');
-    check('import replaces bookmarks in grid',
+    await until(() => groupState().length >= 1 &&
+      allBookmarkIds().includes('bx'));
+    check('v1 import replaces bookmarks (migrated into default group)',
       gridItems().length === 1 &&
         gridItems()[0].querySelector('.bm-name').textContent === '导入的',
       gridItems().map(b => b.querySelector('.bm-name')?.textContent));

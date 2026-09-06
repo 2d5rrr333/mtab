@@ -34,9 +34,14 @@ pub(all) enum Effect {
 pub impl ToJson for Effect
 
 pub(all) enum Event {
-  BookmarkAdd(name~ : String, url~ : String)
-  BookmarkEdit(id~ : String, name~ : String, url~ : String)
+  BookmarkAdd(name~ : String, url~ : String, group~ : String?)
+  BookmarkEdit(id~ : String, name~ : String, url~ : String, group~ : String?)
   BookmarkDelete(id~ : String)
+  BookmarkMove(id~ : String, to_group~ : String, to_index~ : Int)
+  GroupAdd(name~ : String)
+  GroupRename(id~ : String, name~ : String)
+  GroupDelete(id~ : String)
+  GroupMove(id~ : String, to_index~ : Int)
   EngineSelect(id~ : String)
   SearchInput(query~ : String, at~ : Int64?)
   SearchSubmit(query~ : String, at~ : Int64?)

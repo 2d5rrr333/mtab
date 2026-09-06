@@ -231,20 +231,76 @@ function moveHighlight(delta) {
   }
 }
 
-// bookmarks: grid rebuilt on data change, interactions via delegation
+// bookmarks: group sections rebuilt on data change, interactions via
+// delegation (bookmark-groups design D4)
 function renderBookmarks() {
   const section = document.getElementById('bookmarks');
   section.hidden = !config.widgets.bookmarks;
   if (!config.widgets.bookmarks) {
     return;
   }
-  const grid = document.getElementById('bm-grid');
+  const container = document.getElementById('bm-groups');
   const empty = document.getElementById('bm-empty');
-  grid.replaceChildren();
-  empty.hidden = config.bookmarks.length > 0;
-  for (const bm of config.bookmarks) {
+  container.replaceChildren();
+  const total = config.groups.reduce((n, g) => n + g.bookmarks.length, 0);
+  // global empty state only when just the default group exists and it is
+  // empty (keeps the legacy empty-state copy and its assertions intact)
+  empty.hidden = !(total === 0 && config.groups.length === 1);
+  for (const group of config.groups) {
+    container.appendChild(groupNode(group));
+  }
+}
+
+function groupNode(group) {
+  const section = document.createElement('section');
+  section.className = 'bm-group';
+  section.dataset.gid = group.id;
+
+  const header = document.createElement('div');
+  header.className = 'bm-group-header';
+  const drag = document.createElement('span');
+  drag.className = 'bm-group-drag';
+  drag.textContent = '⋮⋮';
+  drag.title = '拖动排序分组';
+  header.appendChild(drag);
+  const name = document.createElement('span');
+  name.className = 'bm-group-name';
+  name.textContent = group.name;
+  header.appendChild(name);
+  const isDefault = group.id === 'g0';
+  if (!isDefault) {
+    const ops = document.createElement('span');
+    ops.className = 'bm-group-ops';
+    const rename = document.createElement('button');
+    rename.type = 'button';
+    rename.className = 'bm-group-rename';
+    rename.title = '重命名分组';
+    rename.textContent = '✎';
+    ops.appendChild(rename);
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'bm-group-del';
+    del.title = '删除分组（书签移回默认分组）';
+    del.textContent = '🗑';
+    ops.appendChild(del);
+    header.appendChild(ops);
+  }
+  section.appendChild(header);
+
+  const grid = document.createElement('div');
+  grid.className = 'bm-grid';
+  for (const bm of group.bookmarks) {
     grid.appendChild(bookmarkNode(bm));
   }
+  section.appendChild(grid);
+
+  if (group.bookmarks.length === 0) {
+    const hint = document.createElement('div');
+    hint.className = 'bm-group-empty';
+    hint.textContent = '拖动书签到这个分组';
+    section.appendChild(hint);
+  }
+  return section;
 }
 
 function bookmarkNode(bm) {
@@ -298,6 +354,181 @@ function faviconFor(url) {
     return `https://${new URL(url).host}/favicon.ico`;
   } catch {
     return 'data:,';
+  }
+}
+
+// ---- pointer drag & drop (bookmark-groups design D3) ----
+// JS reports geometry only; the store decides the outcome via
+// bookmark_move / group_move. Clicks (sub-threshold) pass through.
+
+const DRAG_THRESHOLD_PX = 6;
+let dragState = null; // { kind: 'bookmark'|'group', id, started, fromGroup, fromIndex, indicator }
+
+function dragEvents() {
+  const groupsEl = document.getElementById('bm-groups');
+  // pointerdown on a bookmark card or group drag handle
+  groupsEl.addEventListener('pointerdown', e => {
+    if (e.button !== 0) {
+      return;
+    }
+    const groupSection = e.target.closest('.bm-group');
+    if (!groupSection) {
+      return;
+    }
+    const card = e.target.closest('.bookmark');
+    const handle = e.target.closest('.bm-group-drag');
+    if (card) {
+      dragState = {
+        kind: 'bookmark',
+        id: card.dataset.id,
+        fromGroup: groupSection.dataset.gid,
+        startX: e.clientX,
+        startY: e.clientY,
+        started: false,
+        card,
+      };
+    } else if (handle) {
+      dragState = {
+        kind: 'group',
+        id: groupSection.dataset.gid,
+        startX: e.clientX,
+        startY: e.clientY,
+        started: false,
+        section: groupSection,
+      };
+    }
+  });
+  document.addEventListener('pointermove', e => {
+    if (!dragState) {
+      return;
+    }
+    const dx = e.clientX - dragState.startX;
+    const dy = e.clientY - dragState.startY;
+    if (!dragState.started) {
+      if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+        return;
+      }
+      dragState.started = true;
+      document.body.classList.add('dragging');
+      if (dragState.kind === 'bookmark') {
+        dragState.card.classList.add('drag-source');
+      } else {
+        dragState.section.classList.add('drag-source');
+      }
+    }
+    updateDropIndicator(e);
+  });
+  document.addEventListener('pointerup', e => {
+    if (!dragState) {
+      return;
+    }
+    const state = dragState;
+    dragState = null;
+    document.body.classList.remove('dragging');
+    clearIndicator();
+    if (!state.started) {
+      return; // plain click: existing delegation handles it
+    }
+    if (state.kind === 'bookmark') {
+      state.card.classList.remove('drag-source');
+      const hit = hitTestBookmark(e);
+      if (hit) {
+        dispatch({
+          type: 'bookmark_move',
+          id: state.id,
+          to_group: hit.gid,
+          to_index: hit.index,
+        });
+      }
+    } else {
+      state.section.classList.remove('drag-source');
+      const hit = hitTestGroup(e);
+      if (hit !== null) {
+        dispatch({ type: 'group_move', id: state.id, to_index: hit });
+      }
+    }
+  });
+}
+
+/// Where would a dropped bookmark land: { gid, index } or null.
+function hitTestBookmark(e) {
+  const grid = gridAtPoint(e.clientX, e.clientY);
+  if (!grid) {
+    return null;
+  }
+  const cards = [...grid.querySelectorAll('.bookmark:not(.drag-source)')];
+  const gridRect = grid.getBoundingClientRect();
+  let index = cards.length;
+  for (let i = 0; i < cards.length; i++) {
+    const r = cards[i].getBoundingClientRect();
+    if (e.clientX < r.left + r.width / 2) {
+      index = i;
+      break;
+    }
+  }
+  // empty grids / below all cards: append (gridRect unused, kept for clarity)
+  void gridRect;
+  return { gid: grid.closest('.bm-group').dataset.gid, index };
+}
+
+/// Which absolute group index a dropped group header lands on (or null).
+function hitTestGroup(e) {
+  const sections = [...document.querySelectorAll('.bm-group')];
+  let target = null;
+  for (let i = 0; i < sections.length; i++) {
+    const r = sections[i].getBoundingClientRect();
+    if (e.clientY < r.top + r.height / 2) {
+      target = i;
+      break;
+    }
+  }
+  if (target === null) {
+    target = sections.length - 1;
+  }
+  return target;
+}
+
+function gridAtPoint(x, y) {
+  const grids = [...document.querySelectorAll('.bm-group .bm-grid')];
+  // pick the grid whose bounding box contains the point; fall back to the
+  // nearest one vertically (a drop slightly outside still counts)
+  let best = null;
+  let bestDist = Infinity;
+  for (const g of grids) {
+    const r = g.getBoundingClientRect();
+    let inside = x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    let dist = inside
+      ? 0
+      : Math.max(r.top - y, 0, y - r.bottom);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = g;
+    }
+  }
+  return bestDist <= 120 ? best : null;
+}
+
+/// Insertion indicator line (pure DOM, removed on drop).
+function updateDropIndicator(e) {
+  clearIndicator();
+  if (dragState.kind === 'bookmark') {
+    const hit = hitTestBookmark(e);
+    if (!hit) {
+      return;
+    }
+    const grid = gridAtPoint(e.clientX, e.clientY);
+    const cards = [...grid.querySelectorAll('.bookmark:not(.drag-source)')];
+    const card = cards[Math.min(hit.index, cards.length - 1)];
+    if (card) {
+      card.classList.add(hit.index >= cards.length ? 'drag-indicator after' : 'drag-indicator');
+    }
+  }
+  // group drag indicator: subtle, the section highlight suffices
+}
+
+function clearIndicator() {
+  for (const el of document.querySelectorAll('.drag-indicator')) {
+    el.classList.remove('drag-indicator', 'after');
   }
 }
 
@@ -384,7 +615,36 @@ function buildWallpaperList() {
 
 // ---- bookmark form ----
 
-function openBookmarkForm(bookmark) {
+/// Locate a bookmark across all groups: { bm, gid } or null.
+function findBookmark(id) {
+  for (const g of config.groups) {
+    for (const b of g.bookmarks) {
+      if (b.id === id) {
+        return { bm: b, gid: g.id };
+      }
+    }
+  }
+  return null;
+}
+
+/// Rebuild the form's group dropdown from state.
+function syncGroupSelect(selected) {
+  const select = document.getElementById('bm-form-group');
+  select.replaceChildren();
+  for (const g of config.groups) {
+    const opt = document.createElement('option');
+    opt.value = g.id;
+    opt.textContent = g.name;
+    select.appendChild(opt);
+  }
+  if (selected) {
+    select.value = selected;
+  } else {
+    select.value = config.groups[0] ? config.groups[0].id : '';
+  }
+}
+
+function openBookmarkForm(bookmark, gid) {
   editingBookmarkId = bookmark ? bookmark.id : null;
   document.getElementById('bm-form-title').textContent = bookmark
     ? '编辑书签'
@@ -392,6 +652,7 @@ function openBookmarkForm(bookmark) {
   const form = document.getElementById('bm-form');
   form.elements.name.value = bookmark ? bookmark.name : '';
   form.elements.url.value = bookmark ? bookmark.url : '';
+  syncGroupSelect(gid || null);
   document.getElementById('bm-form-error').hidden = true;
   document.getElementById('bm-modal').hidden = false;
   form.elements.url.focus();
@@ -490,16 +751,32 @@ function wireEvents() {
     }
   });
 
-  // bookmark grid: event delegation (design D5)
-  const grid = document.getElementById('bm-grid');
-  grid.addEventListener('click', e => {
+  // bookmark groups: event delegation (design D5); one listener for cards
+  // and group-header ops alike
+  const groupsEl = document.getElementById('bm-groups');
+  groupsEl.addEventListener('click', e => {
+    const groupSection = e.target.closest('.bm-group');
+    if (groupSection && e.target.closest('.bm-group-rename')) {
+      const g = config.groups.find(g => g.id === groupSection.dataset.gid);
+      if (g) {
+        const name = prompt('新的分组名称', g.name);
+        if (name !== null && name.trim() !== '') {
+          dispatch({ type: 'group_rename', id: g.id, name });
+        }
+      }
+      return;
+    }
+    if (groupSection && e.target.closest('.bm-group-del')) {
+      dispatch({ type: 'group_delete', id: groupSection.dataset.gid });
+      return;
+    }
     const item = e.target.closest('.bookmark');
     if (!item) {
       return;
     }
     if (e.target.closest('.bm-edit')) {
-      const bm = config.bookmarks.find(b => b.id === item.dataset.id);
-      openBookmarkForm(bm);
+      const bm = findBookmark(item.dataset.id);
+      openBookmarkForm(bm.bm, bm.gid);
       return;
     }
     if (e.target.closest('.bm-delete')) {
@@ -507,6 +784,15 @@ function wireEvents() {
       return;
     }
     window.open(item.dataset.url, '_blank', 'noopener'); // bookmark-grid spec
+  });
+  dragEvents();
+
+  // new group button
+  document.getElementById('group-add').addEventListener('click', () => {
+    const name = prompt('分组名称');
+    if (name !== null && name.trim() !== '') {
+      dispatch({ type: 'group_add', name });
+    }
   });
 
   // toolbar
@@ -524,10 +810,11 @@ function wireEvents() {
     e.preventDefault();
     const name = form.elements.name.value.trim();
     const url = form.elements.url.value.trim();
+    const group = form.elements.group.value || null;
     if (editingBookmarkId) {
-      dispatch({ type: 'bookmark_edit', id: editingBookmarkId, name, url });
+      dispatch({ type: 'bookmark_edit', id: editingBookmarkId, name, url, group });
     } else {
-      dispatch({ type: 'bookmark_add', name, url });
+      dispatch({ type: 'bookmark_add', name, url, group });
     }
     closeBookmarkForm();
   });

@@ -55,8 +55,11 @@ test "tick_date outside lunar range still shows the weekday" {
 ///|
 test "bookmark_add normalizes the url and requests a save" {
   let base = @store.open(None, "2025-01-29").state
-  let resp = @store.update(base, BookmarkAdd(name="示例", url="example.com"))
-  let b = resp.state.config.bookmarks[0]
+  let resp = @store.update(
+    base,
+    BookmarkAdd(name="示例", url="example.com", group=None),
+  )
+  let b = resp.state.config.groups[0].bookmarks[0]
   assert_eq(b.name, "示例")
   assert_eq(b.url, "https://example.com")
   assert_eq(resp.effects, [Save])
@@ -65,7 +68,10 @@ test "bookmark_add normalizes the url and requests a save" {
 ///|
 test "bookmark_add rejects an invalid url with a notification" {
   let base = @store.open(None, "2025-01-29").state
-  let resp = @store.update(base, BookmarkAdd(name="坏", url="not a url"))
+  let resp = @store.update(
+    base,
+    BookmarkAdd(name="坏", url="not a url", group=None),
+  )
   assert_true(resp.effects is [NotifyError(..)])
   assert_eq(resp.state, base)
 }
@@ -73,12 +79,20 @@ test "bookmark_add rejects an invalid url with a notification" {
 ///|
 test "bookmark_edit updates name and url in place" {
   let base = @store.open(None, "2025-01-29").state
-  let added = @store.update(base, BookmarkAdd(name="示例", url="example.com")).state
+  let added = @store.update(
+      base,
+      BookmarkAdd(name="示例", url="example.com", group=None),
+    ).state
   let resp = @store.update(
     added,
-    BookmarkEdit(id="b1", name="新名", url="https://new.example.com"),
+    BookmarkEdit(
+      id="b1",
+      name="新名",
+      url="https://new.example.com",
+      group=None,
+    ),
   )
-  let b = resp.state.config.bookmarks[0]
+  let b = resp.state.config.groups[0].bookmarks[0]
   assert_eq(b.name, "新名")
   assert_eq(b.url, "https://new.example.com")
   assert_eq(resp.effects, [Save])
@@ -87,21 +101,30 @@ test "bookmark_edit updates name and url in place" {
 ///|
 test "consecutive adds get distinct ids (browser harness regression)" {
   let base = @store.open(None, "2025-01-29").state
-  let one = @store.update(base, BookmarkAdd(name="一", url="a.example.com")).state
-  let two = @store.update(one, BookmarkAdd(name="二", url="b.example.com")).state
-  let ids = two.config.bookmarks.map(b => b.id)
+  let one = @store.update(
+      base,
+      BookmarkAdd(name="一", url="a.example.com", group=None),
+    ).state
+  let two = @store.update(
+      one,
+      BookmarkAdd(name="二", url="b.example.com", group=None),
+    ).state
+  let ids = two.config.groups[0].bookmarks.map(b => b.id)
   assert_eq(ids, ["b1", "b2"])
   // Deleting one leaves the other intact.
   let rest = @store.update(two, BookmarkDelete(id="b1")).state
-  assert_eq(rest.config.bookmarks.map(b => b.id), ["b2"])
+  assert_eq(rest.config.groups[0].bookmarks.map(b => b.id), ["b2"])
 }
 
 ///|
 test "bookmark_delete removes the bookmark" {
   let base = @store.open(None, "2025-01-29").state
-  let added = @store.update(base, BookmarkAdd(name="示例", url="example.com")).state
+  let added = @store.update(
+      base,
+      BookmarkAdd(name="示例", url="example.com", group=None),
+    ).state
   let resp = @store.update(added, BookmarkDelete(id="b1"))
-  assert_eq(resp.state.config.bookmarks.length(), 0)
+  assert_eq(resp.state.config.groups[0].bookmarks.length(), 0)
   assert_eq(resp.effects, [Save])
   // Deleting a missing id is a no-op without a save.
   let noop = @store.update(added, BookmarkDelete(id="b404"))

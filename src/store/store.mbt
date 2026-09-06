@@ -66,53 +66,128 @@ fn respond(state : Store, effects : Array[Effect]) -> Response {
 ///|
 fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
   match event {
-    BookmarkAdd(name~, url~) =>
+    BookmarkAdd(name~, url~, group~) =>
       match @model.normalize_url(url) {
         None =>
           (store, [NotifyError(message="网址无效，请检查后重试")])
         Some(u) => {
-          let id = next_bookmark_id(store.config.bookmarks)
-          let trimmed = name.trim().to_owned()
-          let display_name = if trimmed == "" { u } else { trimmed }
-          let bookmark : @model.Bookmark = { id, name: display_name, url: u, }
-          let bookmarks = store.config.bookmarks.copy()
-          bookmarks.push(bookmark)
-          ({ ..store, config: { ..store.config, bookmarks, }, }, [Save])
+          let target = match group {
+            Some(gid) => gid
+            None => @model.DEFAULT_GROUP_ID
+          }
+          if !group_exists(store.config.groups, target) {
+            (store, [NotifyError(message="目标分组不存在")])
+          } else {
+            let id = next_bookmark_id(store.config.groups)
+            let trimmed = name.trim().to_owned()
+            let display_name = if trimmed == "" { u } else { trimmed }
+            let bookmark : @model.Bookmark = { id, name: display_name, url: u, }
+            let groups = map_groups(store.config.groups, target, g => {
+              let bookmarks = g.bookmarks.copy()
+              bookmarks.push(bookmark)
+              { ..g, bookmarks, }
+            })
+            ({ ..store, config: { ..store.config, groups, }, }, [Save])
+          }
         }
       }
-    BookmarkEdit(id~, name~, url~) =>
+    BookmarkEdit(id~, name~, url~, group~) =>
       match @model.normalize_url(url) {
         None =>
           (store, [NotifyError(message="网址无效，请检查后重试")])
         Some(u) => {
           let trimmed = name.trim().to_owned()
           let display_name = if trimmed == "" { u } else { trimmed }
-          let bookmarks = store.config.bookmarks.copy()
-          let mut edited = false
-          for i, b in bookmarks {
-            if b.id == id {
-              bookmarks[i] = { id: b.id, name: display_name, url: u, }
-              edited = true
+          // optional group move rides along with the edit
+          match group {
+            Some(gid) if !group_exists(store.config.groups, gid) =>
+              (store, [NotifyError(message="目标分组不存在")])
+            _ => {
+              let edited = edit_bookmark(
+                store.config.groups,
+                id,
+                display_name,
+                u,
+                group,
+              )
+              match edited {
+                Some(groups) =>
+                  ({ ..store, config: { ..store.config, groups, }, }, [Save])
+                None =>
+                  (store, [NotifyError(message="要编辑的书签不存在")])
+              }
             }
-          }
-          if edited {
-            ({ ..store, config: { ..store.config, bookmarks, }, }, [Save])
-          } else {
-            (store, [NotifyError(message="要编辑的书签不存在")])
           }
         }
       }
     BookmarkDelete(id~) => {
-      let remaining = store.config.bookmarks.filter(b => b.id != id)
-      if remaining.length() != store.config.bookmarks.length() {
-        (
-          { ..store, config: { ..store.config, bookmarks: remaining, }, },
-          [Save],
-        )
+      let before = count_bookmarks(store.config.groups)
+      let groups = map_all_groups(store.config.groups, g => {
+        ..g,
+        bookmarks: g.bookmarks.filter(b => b.id != id),
+      })
+      if count_bookmarks(groups) != before {
+        ({ ..store, config: { ..store.config, groups, }, }, [Save])
       } else {
         (store, [])
       }
     }
+    BookmarkMove(id~, to_group~, to_index~) =>
+      if !group_exists(store.config.groups, to_group) {
+        (store, [NotifyError(message="目标分组不存在")])
+      } else {
+        match move_bookmark(store.config.groups, id, to_group, to_index) {
+          Some(groups) =>
+            ({ ..store, config: { ..store.config, groups, }, }, [Save])
+          None => (store, [NotifyError(message="要移动的书签不存在")])
+        }
+      }
+    GroupAdd(name~) => {
+      let trimmed = name.trim().to_owned()
+      if trimmed == "" {
+        (store, [NotifyError(message="分组名称不能为空")])
+      } else {
+        let groups = store.config.groups.copy()
+        groups.push({
+          id: @model.next_group_id(store.config.groups),
+          name: trimmed,
+          bookmarks: [],
+        })
+        ({ ..store, config: { ..store.config, groups, }, }, [Save])
+      }
+    }
+    GroupRename(id~, name~) =>
+      if id == @model.DEFAULT_GROUP_ID {
+        (store, [NotifyError(message="默认分组不能重命名")])
+      } else {
+        let trimmed = name.trim().to_owned()
+        if trimmed == "" {
+          (store, [NotifyError(message="分组名称不能为空")])
+        } else {
+          match rename_group(store.config.groups, id, trimmed) {
+            Some(groups) =>
+              ({ ..store, config: { ..store.config, groups, }, }, [Save])
+            None =>
+              (store, [NotifyError(message="要编辑的分组不存在")])
+          }
+        }
+      }
+    GroupDelete(id~) =>
+      if id == @model.DEFAULT_GROUP_ID {
+        (store, [NotifyError(message="默认分组不能删除")])
+      } else {
+        match delete_group(store.config.groups, id) {
+          Some(groups) =>
+            ({ ..store, config: { ..store.config, groups, }, }, [Save])
+          None => (store, [NotifyError(message="要删除的分组不存在")])
+        }
+      }
+    GroupMove(id~, to_index~) =>
+      match move_group(store.config.groups, id, to_index) {
+        Some(groups) =>
+          ({ ..store, config: { ..store.config, groups, }, }, [Save])
+        None => (store, [NotifyError(message="要移动的分组不存在")])
+      }
     EngineSelect(id~) =>
       if store.config.search.engines.any(e => e.id == id) {
         (
@@ -256,7 +331,8 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
     ConfigImport(json~) =>
       try {
         let cfg = @model.Config::decode(json)
-        if cfg.version == @model.CONFIG_VERSION {
+        // accept both v1 (migrated on decode) and v2 (bookmark-groups D1)
+        if cfg.version == 1 || cfg.version == @model.CONFIG_VERSION {
           (
             {
               config: cfg,
@@ -279,13 +355,16 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
 }
 
 ///|
-/// Generate a fresh bookmark id ("b" + next number above all existing ones).
-fn next_bookmark_id(bookmarks : Array[@model.Bookmark]) -> String {
+/// Generate a fresh bookmark id ("b" + next number above all existing ones
+/// across every group).
+fn next_bookmark_id(groups : Array[@model.Group]) -> String {
   let mut max = 0
-  for b in bookmarks {
-    let n = numeric_suffix(b.id)
-    if n > max {
-      max = n
+  for g in groups {
+    for b in g.bookmarks {
+      let n = numeric_suffix(b.id)
+      if n > max {
+        max = n
+      }
     }
   }
   "b" + (max + 1).to_string()

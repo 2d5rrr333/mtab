@@ -33,9 +33,12 @@
       </div>
     </section>
 
-    <!-- bookmark grid -->
+    <!-- bookmark groups (bookmark-groups design D4) -->
     <section id="bookmarks">
-      <div class="bm-grid" id="bm-grid"></div>
+      <div class="bm-toolbar-row">
+        <button id="group-add" type="button" class="ghost-btn">新建分组</button>
+      </div>
+      <div id="bm-groups"></div>
       <div class="bm-empty" id="bm-empty" hidden>
         还没有书签。点击下方「添加书签」开始收藏常用站点。
       </div>
@@ -54,6 +57,7 @@
       <h3 id="bm-form-title">添加书签</h3>
       <label>名称<input name="name" type="text" placeholder="站点名称（留空则使用网址）"></label>
       <label>网址<input name="url" type="text" placeholder="example.com" required></label>
+      <label>分组<select name="group" id="bm-form-group"></select></label>
       <p class="form-error" id="bm-form-error" hidden></p>
       <div class="modal-actions">
         <button type="submit">保存</button>

@@ -38,7 +38,7 @@ pub fn str_field(
 }
 
 ///|
-fn int_field(
+pub fn int_field(
   map : Map[String, Json],
   key : String,
   path : @json.JsonPath,
@@ -71,6 +71,15 @@ fn int64_field(
 pub fn number_field_opt(map : Map[String, Json], key : String) -> Int64? {
   match map.get(key) {
     Some(Number(n, ..)) => Some(n.to_int64())
+    _ => None
+  }
+}
+
+///|
+/// Optional string field: absent or non-string -> None.
+pub fn str_field_opt(map : Map[String, Json], key : String) -> String? {
+  match map.get(key) {
+    Some(String(s)) => Some(s)
     _ => None
   }
 }

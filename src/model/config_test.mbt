@@ -30,8 +30,10 @@ test "decode accepts the design D6 example shape" {
   }
   let decoded = Config::decode(json.stringify())
   assert_eq(decoded.version, 1)
-  assert_eq(decoded.bookmarks.length(), 1)
-  assert_eq(decoded.bookmarks[0].name, "示例")
+  // v1 shape migrates into the default group (bookmark-groups D1)
+  assert_eq(decoded.groups.length(), 1)
+  assert_eq(decoded.groups[0].bookmarks.length(), 1)
+  assert_eq(decoded.groups[0].bookmarks[0].name, "示例")
   assert_eq(decoded.widgets.clock, true)
   assert_eq(decoded.widgets.bookmarks, false)
   assert_true(decoded.wallpaper is Builtin("w2"))

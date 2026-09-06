@@ -22,13 +22,13 @@ function check(name, cond, detail) {
 
 // -- init (no stored config) --
 let r = JSON.parse(mtab.mtab_init('', '2025-01-29'));
-check('init default config', r.state.config.version === 1);
+check('init default config', r.state.config.version === 2 && r.state.config.groups.length === 1 && r.state.config.groups[0].id === 'g0');
 check('init clock lunar', r.state.clock.lunar === '乙巳年正月初一', r.state.clock);
 check('init clock weekday', r.state.clock.weekday === '星期三', r.state.clock);
 
 // -- bookmark add --
 r = JSON.parse(mtab.mtab_dispatch('{"type":"bookmark_add","name":"示例","url":"example.com"}'));
-check('add normalizes url', r.state.config.bookmarks[0].url === 'https://example.com', r.state.config.bookmarks);
+check('add normalizes url', r.state.config.groups[0].bookmarks[0].url === 'https://example.com', r.state.config.groups[0]);
 check('add requests save', r.effects.some(e => e.type === 'save'), r.effects);
 
 // -- invalid bookmark url --
@@ -55,13 +55,13 @@ check('custom wallpaper', r.state.config.wallpaper.type === 'custom', r.state.co
 
 // -- config export shape (persisted config is the export format) --
 const exported = JSON.stringify(r.state.config);
-check('export has version', JSON.parse(exported).version === 1);
+check('export has version', JSON.parse(exported).version === 2);
 
 // -- config import round-trip into a fresh instance --
 const mod2 = new WebAssembly.Module(bytes, { builtins: ['js-string'] });
 const mtab2 = new WebAssembly.Instance(mod2, { _: imports._ }).exports;
 const r2 = JSON.parse(mtab2.mtab_init(exported, '2025-07-25'));
-check('import restores bookmarks', r2.state.config.bookmarks.length === 1, r2.state.config.bookmarks);
+check('import restores bookmarks', r2.state.config.groups[0].bookmarks.length === 1, r2.state.config.groups);
 check('import restores wallpaper', r2.state.config.wallpaper.data === 'data:image/jpeg;base64,QUJD');
 check('init leap month', r2.state.clock.lunar === '乙巳年闰六月初一', r2.state.clock);
 
@@ -113,6 +113,44 @@ check(
 const legacy = JSON.stringify({ version: 1, bookmarks: [], search: { engines: [], current: 'baidu' }, widgets: { clock: true, bookmarks: true }, wallpaper: { type: 'builtin', id: 'w1' } });
 r = JSON.parse(mtab.mtab_dispatch(`{"type":"config_import","json":${JSON.stringify(legacy)}}`));
 check('legacy config imports with empty history', r.state.config.search.history.length === 0, r.state.config.search);
+
+// -- bookmark groups lifecycle (bookmark-groups change) --
+const modG = new WebAssembly.Module(bytes, { builtins: ['js-string'] });
+const mtabG = new WebAssembly.Instance(modG, { _: imports._ }).exports;
+let rg = JSON.parse(mtabG.mtab_init('', '2025-01-29'));
+// v1 file migration: flat bookmarks land in the default group in order
+const v1file = JSON.stringify({ version: 1, bookmarks: [
+  { id: 'b1', name: '甲', url: 'https://a.com' },
+  { id: 'b2', name: '乙', url: 'https://b.com' },
+], search: { engines: [], current: 'baidu' }, widgets: { clock: true, bookmarks: true }, wallpaper: { type: 'builtin', id: 'w1' } });
+rg = JSON.parse(mtabG.mtab_dispatch(`{"type":"config_import","json":${JSON.stringify(v1file)}}`));
+check('v1 import migrates into default group in order',
+  rg.state.config.groups.length === 1 &&
+  rg.state.config.groups[0].bookmarks.map(b => b.id).join(',') === 'b1,b2',
+  rg.state.config.groups);
+// group lifecycle: add -> add bookmark -> rename -> bookmark_move -> delete
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"group_add","name":"工作"}'));
+check('group_add appends g1', rg.state.config.groups[1].id === 'g1');
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"bookmark_add","name":"丙","url":"c.com","group":"g1"}'));
+check('add into named group lands there', rg.state.config.groups[1].bookmarks[0].id === 'b3');
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"group_rename","id":"g1","name":"学习"}'));
+check('group_rename updates the name', rg.state.config.groups[1].name === '学习');
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"group_move","id":"g1","to_index":0}'));
+check('group_move keeps g0 first', rg.state.config.groups.map(g => g.id).join(',') === 'g0,g1');
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"bookmark_move","id":"b2","to_group":"g1","to_index":0}'));
+check('bookmark_move crosses groups',
+  rg.state.config.groups[1].bookmarks.map(b => b.id).join(',') === 'b2,b3' &&
+  rg.state.config.groups[0].bookmarks.map(b => b.id).join(',') === 'b1');
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"group_delete","id":"g1"}'));
+check('group_delete falls bookmarks back into g0 in order',
+  rg.state.config.groups.length === 1 &&
+  rg.state.config.groups[0].bookmarks.map(b => b.id).join(',') === 'b1,b2,b3',
+  rg.state.config.groups[0]);
+// g0 protection
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"group_delete","id":"g0"}'));
+check('g0 delete is refused', rg.effects[0].type === 'notify_error');
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"group_rename","id":"g0","name":"x"}'));
+check('g0 rename is refused', rg.effects[0].type === 'notify_error');
 
 // -- solar terms & festivals (solar-terms-festivals change) --
 // fresh instance on a festival day: 2025-01-29 春节 (festival wins)

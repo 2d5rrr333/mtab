@@ -7,15 +7,27 @@ import {
 }
 
 // Values
-pub const CONFIG_VERSION : Int = 1
+pub const CONFIG_VERSION : Int = 2
+
+pub const DEFAULT_GROUP_ID : String = "g0"
+
+pub fn ensure_groups_valid(Array[Group]) -> Array[Group]
 
 pub fn expect_object(Json, @json.JsonPath) -> Map[String, Json] raise @json.JsonDecodeError
+
+pub fn int_field(Map[String, Json], String, @json.JsonPath) -> Int raise @json.JsonDecodeError
+
+pub fn make_default_group(Array[Bookmark]) -> Group
+
+pub fn next_group_id(Array[Group]) -> String
 
 pub fn normalize_url(String) -> String?
 
 pub fn number_field_opt(Map[String, Json], String) -> Int64?
 
 pub fn str_field(Map[String, Json], String, @json.JsonPath) -> String raise @json.JsonDecodeError
+
+pub fn str_field_opt(Map[String, Json], String) -> String?
 
 // Errors
 
@@ -30,7 +42,7 @@ pub impl @json.FromJson for Bookmark
 
 pub(all) struct Config {
   version : Int
-  bookmarks : Array[Bookmark]
+  groups : Array[Group]
   search : SearchConfig
   widgets : WidgetsConfig
   wallpaper : Wallpaper
@@ -48,6 +60,14 @@ pub(all) struct Engine {
 } derive(Eq, @debug.Debug)
 pub impl ToJson for Engine
 pub impl @json.FromJson for Engine
+
+pub(all) struct Group {
+  id : String
+  name : String
+  bookmarks : Array[Bookmark]
+} derive(Eq, @debug.Debug)
+pub impl ToJson for Group
+pub impl @json.FromJson for Group
 
 pub(all) struct HistoryEntry {
   query : String
