@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2d5rrr333/mtab/pinyin"
+
+// Values
+pub fn phrase_initials(String) -> String
+
+pub fn phrase_pinyin(String) -> String
+
+pub fn pinyin_of(Char) -> String?
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

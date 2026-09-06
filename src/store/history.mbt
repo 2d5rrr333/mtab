@@ -61,8 +61,9 @@ fn evict_lowest(entries : Array[@model.HistoryEntry], now_ms : Int64) -> Unit {
 
 ///|
 /// Suggestions for an input: empty query -> most recent entries by
-/// last_used_ms; otherwise trie prefix matches (case-insensitive) ranked
-/// by score, then by last_used_ms, then by query for determinism.
+/// last_used_ms; a pure-ASCII-letter query goes through the three-tier
+/// pinyin path (pinyin-suggest D2); anything else uses the trie prefix
+/// match. Never persists.
 fn suggest_for(
   history : Array[@model.HistoryEntry],
   query : String,
@@ -72,12 +73,16 @@ fn suggest_for(
   if trimmed == "" {
     return recent_suggestions(history)
   }
+  let lower = trimmed.to_lower()
+  if is_ascii_letters(lower) {
+    return suggest_ascii(history, lower, now_ms)
+  }
   // Build a trie over lowercased queries, id = query text itself.
   let trie = @trie.Trie::new()
   for e in history {
     trie.insert(e.query.to_lower(), e.query)
   }
-  let ids = trie.prefix_query(trimmed.to_lower())
+  let ids = trie.prefix_query(lower)
   let matched : Array[@model.HistoryEntry] = []
   for id in ids {
     for e in history {
@@ -89,6 +94,78 @@ fn suggest_for(
   }
   sort_by_score(matched, now_ms)
   first_n(matched, SUGGESTION_LIMIT)
+}
+
+///|
+/// Whether `s` is non-empty and consists only of a-z.
+fn is_ascii_letters(s : String) -> Bool {
+  if s.length() == 0 {
+    return false
+  }
+  for _, c in s {
+    if c < 'a' || c > 'z' {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Three-tier match for ASCII-letter queries (pinyin-suggest D2):
+/// tier 0 raw text prefix, tier 1 full-pinyin prefix, tier 2 initials
+/// prefix. Tier ranks above score; ties fall back to the score order.
+fn suggest_ascii(
+  history : Array[@model.HistoryEntry],
+  q : String,
+  now_ms : Int64,
+) -> Array[@model.HistoryEntry] {
+  // (tier, entry) pairs
+  let matched : Array[(Int, @model.HistoryEntry)] = []
+  for e in history {
+    let lq = e.query.to_lower()
+    let tier = if lq.has_prefix(q) {
+      0
+    } else if @pinyin.phrase_pinyin(e.query).to_lower().has_prefix(q) {
+      1
+    } else if @pinyin.phrase_initials(e.query).to_lower().has_prefix(q) {
+      2
+    } else {
+      -1
+    }
+    if tier >= 0 {
+      matched.push((tier, e))
+    }
+  }
+  // insertion sort: tier asc, then the established entry order
+  for i in 1..<matched.length() {
+    let mut j = i
+    while j > 0 && pair_before(matched[j], matched[j - 1], now_ms) {
+      let tmp = matched[j - 1]
+      matched[j - 1] = matched[j]
+      matched[j] = tmp
+      j = j - 1
+    }
+  }
+  let out : Array[@model.HistoryEntry] = []
+  for pair in matched {
+    if out.length() == SUGGESTION_LIMIT {
+      break
+    }
+    out.push(pair.1)
+  }
+  out
+}
+
+///|
+fn pair_before(
+  a : (Int, @model.HistoryEntry),
+  b : (Int, @model.HistoryEntry),
+  now_ms : Int64,
+) -> Bool {
+  if a.0 != b.0 {
+    return a.0 < b.0
+  }
+  entry_before(a.1, b.1, now_ms)
 }
 
 ///|

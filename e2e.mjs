@@ -171,8 +171,22 @@ check('blur clamps to 0',
 rg = JSON.parse(mtabG.mtab_dispatch('{"type":"wallpaper_blur_set","amount":0}'));
 check('blur no-op when unchanged', rg.effects.length === 0);
 
-// -- solar terms & festivals (solar-terms-festivals change) --
-// fresh instance on a festival day: 2025-01-29 春节 (festival wins)
+// -- pinyin suggestions (pinyin-suggest change) --
+const modP = new WebAssembly.Module(bytes, { builtins: ['js-string'] });
+const mtabP = new WebAssembly.Instance(modP, { _: imports._ }).exports;
+let rp = JSON.parse(mtabP.mtab_init('', '2025-01-29'));
+rp = JSON.parse(mtabP.mtab_dispatch('{"type":"search_submit","query":"春节","at":1000}'));
+rp = JSON.parse(mtabP.mtab_dispatch('{"type":"search_submit","query":"中秋节","at":1100}'));
+rp = JSON.parse(mtabP.mtab_dispatch('{"type":"search_input","query":"chun","at":1200}'));
+check('full pinyin matches 春节',
+  rp.state.suggestions.map(s => s.query).join(',') === '春节', rp.state.suggestions);
+rp = JSON.parse(mtabP.mtab_dispatch('{"type":"search_input","query":"zqj","at":1200}'));
+check('initials match 中秋节',
+  rp.state.suggestions.map(s => s.query).join(',') === '中秋节', rp.state.suggestions);
+rp = JSON.parse(mtabP.mtab_dispatch('{"type":"search_input","query":"zzz","at":1200}'));
+check('no pinyin match is empty', rp.state.suggestions.length === 0);
+
+// -- solar terms & festivals (solar-terms-festivals change) --// fresh instance on a festival day: 2025-01-29 春节 (festival wins)
 const mod3 = new WebAssembly.Module(bytes, { builtins: ['js-string'] });
 const mtab3 = new WebAssembly.Instance(mod3, { _: imports._ }).exports;
 const r3 = JSON.parse(mtab3.mtab_init('', '2025-01-29'));

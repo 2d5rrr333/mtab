@@ -633,7 +633,10 @@ function updateDropIndicator(e) {
     const cards = [...grid.querySelectorAll('.bookmark:not(.drag-source)')];
     const card = cards[Math.min(hit.index, cards.length - 1)];
     if (card) {
-      card.classList.add(hit.index >= cards.length ? 'drag-indicator after' : 'drag-indicator');
+      card.classList.add('drag-indicator');
+      if (hit.index >= cards.length) {
+        card.classList.add('after');
+      }
     }
   }
   // group drag indicator: subtle, the section highlight suffices

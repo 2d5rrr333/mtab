@@ -1,0 +1,7 @@
+// Package pinyin: toneless pinyin lookup for common Chinese characters
+// (pinyin-suggest design D1). Pure data + lookup, no FFI.
+//
+// The table maps single characters to their common toneless reading; ü is
+// encoded as "v" (matching mainstream pinyin IMEs). Polyphonic characters
+// take their most common reading. Unknown characters are skipped by the
+// phrase functions.

@@ -582,6 +582,28 @@
     check('typed prefix filters case-insensitively',
       suggestItems().map(i => i.dataset.query).join(',') === 'mooncake 食谱,moonbit 入门',
       suggestItems().map(i => i.dataset.query));
+    // pinyin matching: chinese history via config_import, typed ascii hits
+    // (config restored afterwards — later checks depend on the moon history)
+    const cfgBeforePinyin = JSON.parse(JSON.stringify(window.mtab.config));
+    const cfgPinyin = JSON.parse(JSON.stringify(window.mtab.config));
+    cfgPinyin.search.history = [
+      { query: '春节', count: 1, lastUsedMs: 6000 },
+    ];
+    window.mtab.dispatch({ type: 'config_import', json: JSON.stringify(cfgPinyin) });
+    await tick();
+    await typeQuery('chun');
+    check('pinyin query suggests chinese history',
+      suggestItems().map(i => i.dataset.query).join(',') === '春节',
+      suggestItems().map(i => i.dataset.query));
+    await typeQuery('cj');
+    check('initials query suggests chinese history',
+      suggestItems().map(i => i.dataset.query).join(',') === '春节',
+      suggestItems().map(i => i.dataset.query));
+    window.mtab.dispatch({ type: 'config_import', json: JSON.stringify(cfgBeforePinyin) });
+    await tick();
+    $('search-input').value = '';
+    $('search-input').dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
     // no match -> dropdown hidden
     await typeQuery('zzz');
     check('no matching prefix hides dropdown',
