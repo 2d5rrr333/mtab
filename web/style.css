@@ -128,6 +128,59 @@ body {
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
 }
 
+/* ---- clock badges (ux-polish-2 D1) ---- */
+
+.clock-badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  padding: 0.1em 0.6em;
+  border-radius: 999px;
+  vertical-align: middle;
+  margin: 0 0.1em;
+}
+
+.clock-badge.badge-term {
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.clock-badge.badge-term:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.clock-badge.badge-festival {
+  background: rgba(214, 69, 60, 0.85);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(214, 69, 60, 0.45);
+}
+
+.clock-badge.badge-festival.traditional {
+  background: rgba(200, 140, 60, 0.88);
+  box-shadow: 0 0 10px rgba(200, 140, 60, 0.4);
+}
+
+/* ---- jieqi info modal (ux-polish-2 D2) ---- */
+
+.term-modal {
+  width: min(320px, 90vw);
+  gap: 0.6rem;
+}
+
+.term-modal-lon {
+  font-size: 0.8rem;
+  opacity: 0.65;
+}
+
+.term-modal-blurb {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  opacity: 0.92;
+}
+
 .widget[hidden],
 #bookmarks[hidden] {
   display: none;
@@ -190,13 +243,15 @@ body {
   transition:
     border-color 0.15s ease,
     background 0.15s ease,
-    box-shadow 0.15s ease;
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
 
 #search-input:focus {
   border-color: rgba(255, 255, 255, 0.85);
   background: rgba(255, 255, 255, 0.22);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
 }
 
 #search-input::placeholder {
@@ -250,6 +305,17 @@ body {
   display: none;
 }
 
+.search-suggest:not([hidden]) {
+  animation: suggest-in 0.16s ease;
+}
+
+@keyframes suggest-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
 .suggest-item {
   display: flex;
   align-items: center;
@@ -257,6 +323,7 @@ body {
   padding: 0.5rem 0.8rem;
   cursor: pointer;
   font-size: 0.92rem;
+  transition: padding-left 0.15s ease, background 0.15s ease;
 }
 
 .suggest-item .suggest-text {
@@ -270,6 +337,7 @@ body {
   font-size: 0.72rem;
   opacity: 0.55;
   flex-shrink: 0;
+  transition: opacity 0.15s ease;
 }
 
 .suggest-item .suggest-del {
@@ -294,6 +362,14 @@ body {
 .suggest-item:hover,
 .suggest-item.active {
   background: rgba(255, 255, 255, 0.12);
+}
+
+.suggest-item:hover {
+  padding-left: 1rem;
+}
+
+.suggest-item:hover .suggest-count {
+  opacity: 0.9;
 }
 
 .suggest-item.active {

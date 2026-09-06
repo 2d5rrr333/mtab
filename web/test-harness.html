@@ -85,6 +85,18 @@
     </div>
   </div>
 
+  <!-- jieqi info modal (ux-polish-2) -->
+  <div class="modal-backdrop" id="term-modal" hidden>
+    <div class="modal term-modal">
+      <h3 id="term-modal-name"></h3>
+      <p class="term-modal-lon" id="term-modal-lon"></p>
+      <p class="term-modal-blurb" id="term-modal-blurb"></p>
+      <div class="modal-actions">
+        <button type="button" id="term-modal-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" hidden></div>
   <ol id="test-results"></ol>
 
@@ -539,11 +551,32 @@
     await tick();
     check('date line shows 寒露 on term day',
       $('clock-date').textContent.includes('寒露'));
+    // ux-polish-2: term renders as a clickable badge, textContent intact
+    const termBadge = document.querySelector('#clock-date .badge-term');
+    check('term rendered as badge', !!termBadge);
+    termBadge.click();
+    check('term modal opens with name, blurb and longitude',
+      !$('term-modal').hidden &&
+      $('term-modal-name').textContent === '寒露' &&
+      $('term-modal-blurb').textContent.length > 0 &&
+      $('term-modal-lon').textContent.includes('195'));
+    $('term-modal-close').click();
+    check('term modal closes via button', $('term-modal').hidden);
+    termBadge.click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    check('term modal closes via Escape', $('term-modal').hidden);
     // festival day: festival wins (春节 2025-01-29, also no term that day)
     window.mtab.dispatch({ type: 'tick_date', date: '2025-01-29' });
     await tick();
     check('date line shows 春节 festival',
       $('clock-date').textContent.includes('春节'));
+    check('traditional festival badge class',
+      document.querySelector('#clock-date .clock-badge')?.className.includes('badge-festival traditional'));
+    // statutory festival badge (国庆 10-01): warm red, no traditional
+    window.mtab.dispatch({ type: 'tick_date', date: '2025-10-01' });
+    await tick();
+    check('statutory festival badge class',
+      document.querySelector('#clock-date .clock-badge')?.className === 'clock-badge badge-festival');
     // ordinary day: neither term nor festival appears
     window.mtab.dispatch({ type: 'tick_date', date: '2025-10-07' });
     await tick();
@@ -553,6 +586,24 @@
     // restore today so later wallpaper/other checks are unaffected
     window.mtab.dispatch({ type: 'tick_date', date: new Date().toISOString().slice(0, 10) });
     await tick();
+
+    // -- ux-polish-2: presentation rules --
+    check('clock badge variant rules present',
+      ruleFor('.clock-badge.badge-festival') &&
+      ruleFor('.clock-badge.badge-festival.traditional') &&
+      ruleFor('.clock-badge.badge-term'));
+    check('search focus lift adds transform',
+      ruleFor('#search-input:focus') &&
+      ruleFor('#search-input:focus').style.transform.includes('translateY'));
+    const suggestShown = rulesWhere(
+      r => r.selectorText === '.search-suggest:not([hidden])',
+    );
+    check('suggestion panel entrance animation',
+      suggestShown.length > 0 &&
+      suggestShown[0].style.animationName === 'suggest-in');
+    check('suggest item hover shift rule',
+      ruleFor('.suggest-item:hover') &&
+      ruleFor('.suggest-item:hover').style.paddingLeft !== '');
 
     // -- widget toggle via settings --
     $('settings-open').click();

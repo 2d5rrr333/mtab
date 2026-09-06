@@ -8,6 +8,48 @@ const STORAGE_KEY = 'mtab.config';
 const WALLPAPERS = ['w1', 'w2', 'w3', 'w4'];
 const wallpaperUrl = id => `wallpapers/${id}.svg`;
 
+// 24 jieqi blurbs (ux-polish-2 D2): static display copy, shell-side only.
+// lon = the multiple of 15° solar longitude the term changeover crosses.
+const TERM_INFO = [
+  { name: '春分', lon: 0, blurb: '昼夜平分，春季过半，万物竞生。' },
+  { name: '清明', lon: 15, blurb: '气清景明，踏青祭祖的时节。' },
+  { name: '谷雨', lon: 30, blurb: '雨生百谷，播种移苗正当时。' },
+  { name: '立夏', lon: 45, blurb: '夏季开始，万物进入繁茂期。' },
+  { name: '小满', lon: 60, blurb: '麦粒渐满，将熟未熟。' },
+  { name: '芒种', lon: 75, blurb: '有芒之谷可种，麦收稻种两头忙。' },
+  { name: '夏至', lon: 90, blurb: '白昼最长，阳气盛极而转衰。' },
+  { name: '小暑', lon: 105, blurb: '天气始热，尚未达到极点。' },
+  { name: '大暑', lon: 120, blurb: '一年中最炎热的时期。' },
+  { name: '立秋', lon: 135, blurb: '秋季开始，暑去凉来。' },
+  { name: '处暑', lon: 150, blurb: '暑气至此而止，秋意渐起。' },
+  { name: '白露', lon: 165, blurb: '天气转凉，露水凝而发白。' },
+  { name: '秋分', lon: 180, blurb: '昼夜再度平分，秋季过半。' },
+  { name: '寒露', lon: 195, blurb: '露水已寒，秋意日渐深浓。' },
+  { name: '霜降', lon: 210, blurb: '露结为霜，深秋将尽。' },
+  { name: '立冬', lon: 225, blurb: '冬季开始，万物收藏闭蓄。' },
+  { name: '小雪', lon: 240, blurb: '天始降雪，雪量尚小。' },
+  { name: '大雪', lon: 255, blurb: '降雪转盛，仲冬时节到来。' },
+  { name: '冬至', lon: 270, blurb: '白昼最短，阴极而阳气始生。' },
+  { name: '小寒', lon: 285, blurb: '天气寒冷，尚未到达极点。' },
+  { name: '大寒', lon: 300, blurb: '一年中最寒冷的时期。' },
+  { name: '立春', lon: 315, blurb: '春季开始，万物复苏。' },
+  { name: '雨水', lon: 330, blurb: '降水增多，冰雪消融。' },
+  { name: '惊蛰', lon: 345, blurb: '春雷始鸣，蛰虫惊醒而出。' },
+];
+
+/// Open the jieqi info modal for a term name.
+function openTermModal(name) {
+  const info = TERM_INFO.find(t => t.name === name);
+  if (!info) {
+    return;
+  }
+  document.getElementById('term-modal-name').textContent = info.name;
+  document.getElementById('term-modal-lon').textContent = `太阳黄经 ${info.lon}°`;
+  document.getElementById('term-modal-blurb').textContent = info.blurb;
+  document.getElementById('term-modal').hidden = false;
+  document.getElementById('term-modal-close').focus();
+}
+
 /** Load the wasm-gc module with JS string builtins (task 1.2 spike result). */
 async function loadWasm() {
   const bytes = await (await fetch('wasm/main.wasm')).arrayBuffer();
@@ -110,6 +152,11 @@ function renderAll() {
 }
 
 // clock: seconds tick locally; date line comes from wasm (design D4)
+// Lunar-traditional festivals get the gold badge; statutory ones warm red.
+const TRADITIONAL_FESTIVALS = new Set([
+  '春节', '元宵节', '端午节', '七夕节', '中秋节', '重阳节', '除夕',
+]);
+
 function renderClock() {
   const el = document.getElementById('clock');
   el.hidden = !config.widgets.clock;
@@ -118,17 +165,44 @@ function renderClock() {
   }
   updateClockTime();
   const d = new Date();
+  const line = document.getElementById('clock-date');
   // festival wins the slot, jieqi only on non-festival days (spec priority)
-  const special = clockView
-    ? (clockView.festival || clockView.solar_term || '')
-    : '';
   const parts = [
-    `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`,
-    clockView ? clockView.weekday : '',
-    special,
-    clockView && clockView.lunar ? clockView.lunar : '',
-  ].filter(Boolean);
-  document.getElementById('clock-date').textContent = parts.join(' · ');
+    document.createTextNode(
+      `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`,
+    ),
+  ];
+  if (clockView && clockView.weekday) {
+    parts.push(document.createTextNode(clockView.weekday));
+  }
+  if (clockView) {
+    const special = clockView.festival || clockView.solar_term || '';
+    if (special) {
+      const badge = document.createElement('span');
+      if (clockView.festival) {
+        badge.className = TRADITIONAL_FESTIVALS.has(clockView.festival)
+          ? 'clock-badge badge-festival traditional'
+          : 'clock-badge badge-festival';
+      } else {
+        badge.className = 'clock-badge badge-term';
+        badge.title = '查看节气简介';
+      }
+      badge.textContent = special;
+      parts.push(badge);
+    }
+  }
+  if (clockView && clockView.lunar) {
+    parts.push(document.createTextNode(clockView.lunar));
+  }
+  line.replaceChildren();
+  let first = true;
+  for (const p of parts) {
+    if (!first) {
+      line.appendChild(document.createTextNode(' · '));
+    }
+    line.appendChild(p);
+    first = false;
+  }
 }
 
 function updateClockTime() {
@@ -729,9 +803,29 @@ function wireEvents() {
   });
   document.getElementById('search-go').addEventListener('click', submitSearch);
 
+  // term info modal (ux-polish-2 D2): badge click opens, three ways close
+  document.getElementById('clock-date').addEventListener('click', e => {
+    const badge = e.target.closest('.badge-term');
+    if (badge) {
+      openTermModal(badge.textContent);
+    }
+  });
+  document.getElementById('term-modal-close').addEventListener('click', () => {
+    document.getElementById('term-modal').hidden = true;
+  });
+  document.getElementById('term-modal').addEventListener('click', e => {
+    if (e.target.id === 'term-modal') {
+      e.target.hidden = true;
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !document.getElementById('term-modal').hidden) {
+      document.getElementById('term-modal').hidden = true;
+    }
+  });
+
   // suggestion dropdown: delegated clicks (pick entry / delete one)
-  document.getElementById('search-suggest').addEventListener('mousedown', e => {
-    e.preventDefault(); // keep input focus
+  document.getElementById('search-suggest').addEventListener('mousedown', e => {    e.preventDefault(); // keep input focus
     const item = e.target.closest('.suggest-item');
     if (!item) {
       return;
