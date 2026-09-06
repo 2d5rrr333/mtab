@@ -9,9 +9,13 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install MoonBit toolchain
+        # Pin to the toolchain the codebase is verified against; `latest`
+        # may drift (moon exits -1/255 on failure, hard to attribute).
+        env:
+          MOONBIT_INSTALL_VERSION: 0.1.20260819
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
