@@ -4,7 +4,7 @@
 test "2025-01-29 is 乙巳年正月初一" {
   let lunar = solar_to_lunar(2025, 1, 29)
   assert_true(
-    lunar is Some({ year: 2025, month: 1, is_leap_month: false, day: 1 }),
+    lunar is Some({ year: 2025, month: 1, is_leap_month: false, day: 1, }),
   )
   assert_eq(lunar.unwrap().to_display(), "乙巳年正月初一")
   assert_eq(lunar.unwrap().zodiac(), "蛇")
@@ -15,7 +15,7 @@ test "2025 leap month six is marked" {
   // 2025-07-25 is 闰六月初一.
   let lunar = solar_to_lunar(2025, 7, 25)
   assert_true(
-    lunar is Some({ year: 2025, month: 6, is_leap_month: true, day: 1 }),
+    lunar is Some({ year: 2025, month: 6, is_leap_month: true, day: 1, }),
   )
   assert_eq(lunar.unwrap().month_name(), "闰六月")
   // Day after the leap month ends is still a normal date (2025-08-23).

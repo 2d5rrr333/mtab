@@ -12,7 +12,7 @@ test "open computes weekday and lunar for today (task 3.2)" {
   let resp = @store.open(None, "2025-01-29")
   assert_true(
     resp.state.clock
-    is Some({ weekday: "星期三", lunar: Some("乙巳年正月初一") }),
+    is Some({ weekday: "星期三", lunar: Some("乙巳年正月初一"), }),
   )
 }
 
@@ -22,7 +22,7 @@ test "tick_date recomputes the clock without saving (task 3.2)" {
   let resp = @store.update(base, TickDate(date="2025-07-25"))
   assert_true(
     resp.state.clock
-    is Some({ weekday: "星期五", lunar: Some("乙巳年闰六月初一") }),
+    is Some({ weekday: "星期五", lunar: Some("乙巳年闰六月初一"), }),
   )
   assert_eq(resp.effects, [])
   // Display-only: config untouched.
@@ -165,7 +165,7 @@ test "wallpaper_set_builtin and wallpaper_set_custom update and save" {
 test "config_import replaces the whole config and saves (task 2.4)" {
   let base = @store.open(None, "2025-01-29").state
   let other = @model.Config::default()
-  let other = { ..other, widgets: { clock: false, bookmarks: false } }
+  let other = { ..other, widgets: { clock: false, bookmarks: false, }, }
   let resp = @store.update(base, ConfigImport(json=other.encode()))
   assert_eq(resp.state.config, other)
   assert_eq(resp.effects, [Save])
@@ -192,7 +192,7 @@ test "open falls back to the default config on undecodable storage" {
 ///|
 test "open restores a previously stored config" {
   let cfg = @model.Config::default()
-  let cfg = { ..cfg, search: { ..cfg.search, current: "bing" } }
+  let cfg = { ..cfg, search: { ..cfg.search, current: "bing", }, }
   let resp = @store.open(Some(cfg.encode()), "2025-01-29")
   assert_eq(resp.state.config, cfg)
 }

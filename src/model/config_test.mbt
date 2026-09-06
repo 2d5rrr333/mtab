@@ -40,7 +40,7 @@ test "decode accepts the design D6 example shape" {
 ///|
 test "custom wallpaper round-trips with embedded data" {
   let cfg = Config::default()
-  let cfg = { ..cfg, wallpaper: Custom("data:image/jpeg;base64,QUJD") }
+  let cfg = { ..cfg, wallpaper: Custom("data:image/jpeg;base64,QUJD"), }
   let decoded = Config::decode(cfg.encode())
   assert_true(decoded.wallpaper is Custom("data:image/jpeg;base64,QUJD"))
 }

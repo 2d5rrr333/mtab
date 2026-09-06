@@ -34,19 +34,19 @@ pub fn open(stored : String?, today : String) -> Response {
       }
     None => @model.Config::default()
   }
-  respond({ config, clock: clock_view_for(today) }, [])
+  respond({ config, clock: clock_view_for(today), }, [])
 }
 
 ///|
 /// Apply one event; returns the next full state plus effects for the shell.
 pub fn update(store : Store, event : Event) -> Response {
   let (next, effects) = handle(store, event)
-  { state: next, effects }
+  { state: next, effects, }
 }
 
 ///|
 fn respond(state : Store, effects : Array[Effect]) -> Response {
-  { state, effects }
+  { state, effects, }
 }
 
 ///|
@@ -60,10 +60,10 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
           let id = next_bookmark_id(store.config.bookmarks)
           let trimmed = name.trim().to_owned()
           let display_name = if trimmed == "" { u } else { trimmed }
-          let bookmark : @model.Bookmark = { id, name: display_name, url: u }
+          let bookmark : @model.Bookmark = { id, name: display_name, url: u, }
           let bookmarks = store.config.bookmarks.copy()
           bookmarks.push(bookmark)
-          ({ ..store, config: { ..store.config, bookmarks, } }, [Save])
+          ({ ..store, config: { ..store.config, bookmarks, }, }, [Save])
         }
       }
     BookmarkEdit(id~, name~, url~) =>
@@ -77,12 +77,12 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
           let mut edited = false
           for i, b in bookmarks {
             if b.id == id {
-              bookmarks[i] = { id: b.id, name: display_name, url: u }
+              bookmarks[i] = { id: b.id, name: display_name, url: u, }
               edited = true
             }
           }
           if edited {
-            ({ ..store, config: { ..store.config, bookmarks, } }, [Save])
+            ({ ..store, config: { ..store.config, bookmarks, }, }, [Save])
           } else {
             (store, [NotifyError(message="要编辑的书签不存在")])
           }
@@ -91,7 +91,10 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
     BookmarkDelete(id~) => {
       let remaining = store.config.bookmarks.filter(b => b.id != id)
       if remaining.length() != store.config.bookmarks.length() {
-        ({ ..store, config: { ..store.config, bookmarks: remaining } }, [Save])
+        (
+          { ..store, config: { ..store.config, bookmarks: remaining, }, },
+          [Save],
+        )
       } else {
         (store, [])
       }
@@ -103,7 +106,7 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
             ..store,
             config: {
               ..store.config,
-              search: { ..store.config.search, current: id },
+              search: { ..store.config.search, current: id, },
             },
           },
           [Save],
@@ -140,7 +143,7 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
               ..store,
               config: {
                 ..store.config,
-                widgets: { ..widgets, clock: !widgets.clock },
+                widgets: { ..widgets, clock: !widgets.clock, },
               },
             },
             [Save],
@@ -151,7 +154,7 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
               ..store,
               config: {
                 ..store.config,
-                widgets: { ..widgets, bookmarks: !widgets.bookmarks },
+                widgets: { ..widgets, bookmarks: !widgets.bookmarks, },
               },
             },
             [Save],
@@ -163,7 +166,7 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
       (
         {
           ..store,
-          config: { ..store.config, wallpaper: @model.Wallpaper::Builtin(id) },
+          config: { ..store.config, wallpaper: @model.Wallpaper::Builtin(id), },
         },
         [Save],
       )
@@ -171,7 +174,7 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
       (
         {
           ..store,
-          config: { ..store.config, wallpaper: @model.Wallpaper::Custom(data) },
+          config: { ..store.config, wallpaper: @model.Wallpaper::Custom(data), },
         },
         [Save],
       )
@@ -179,7 +182,7 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
       try {
         let cfg = @model.Config::decode(json)
         if cfg.version == @model.CONFIG_VERSION {
-          ({ config: cfg, clock: store.clock }, [Save])
+          ({ config: cfg, clock: store.clock, }, [Save])
         } else {
           (
             store,
@@ -189,7 +192,7 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
       } catch {
         _ => (store, [NotifyError(message="导入失败：文件格式无效")])
       }
-    TickDate(date~) => ({ ..store, clock: clock_view_for(date) }, [])
+    TickDate(date~) => ({ ..store, clock: clock_view_for(date), }, [])
   }
 }
 
@@ -272,7 +275,7 @@ fn clock_view_for(date : String) -> ClockView? {
         Some(ld) => Some(ld.to_display())
         None => None
       }
-      Some({ weekday: @lunar.weekday_name(y, m, d), lunar })
+      Some({ weekday: @lunar.weekday_name(y, m, d), lunar, })
     }
     None => None
   }

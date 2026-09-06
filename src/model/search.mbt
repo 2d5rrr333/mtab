@@ -48,5 +48,5 @@ pub impl FromJson for SearchConfig with fn from_json(
   for i, item in array_field(map, "engines", path) {
     engines.push(@json.from_json(item, path=path.add_index(i)))
   }
-  { engines, current: str_field(map, "current", path) }
+  { engines, current: str_field(map, "current", path), }
 }

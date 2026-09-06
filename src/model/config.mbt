@@ -72,7 +72,7 @@ pub fn Config::default() -> Config {
       ],
       current: "baidu",
     },
-    widgets: { clock: true, bookmarks: true },
+    widgets: { clock: true, bookmarks: true, },
     wallpaper: Builtin("w1"),
   }
 }

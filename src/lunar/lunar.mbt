@@ -161,7 +161,7 @@ pub fn solar_to_lunar(y : Int, m : Int, d : Int) -> LunarDate? {
     offset = offset + temp
     j = j - 1
   }
-  Some({ year, month: j, is_leap_month: is_leap, day: offset + 1 })
+  Some({ year, month: j, is_leap_month: is_leap, day: offset + 1, })
 }
 
 ///|
