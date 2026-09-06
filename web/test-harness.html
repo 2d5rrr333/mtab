@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>mtab test harness</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- wallpaper crossfade layers (design D4) -->
+  <div id="wallpaper-a" class="wallpaper-layer"></div>
+  <div id="wallpaper-b" class="wallpaper-layer"></div>
+  <!-- readability scrim above wallpaper, below content (design D3) -->
+  <div id="scrim"></div>
+
+  <!-- same skeleton as index.html; app.js renders into these nodes -->
+  <main id="app">
+    <header id="clock" class="widget">
+      <div class="time" id="clock-time">--:--:--</div>
+      <div class="date-line" id="clock-date"></div>
+    </header>
+    <section id="search">
+      <div class="engine-bar" id="engine-bar"></div>
+      <div class="search-row">
+        <input id="search-input" type="text" placeholder="输入关键词，回车搜索" autocomplete="off">
+        <button id="search-go" type="button" title="搜索">搜索</button>
+      </div>
+    </section>
+    <section id="bookmarks">
+      <div class="bm-grid" id="bm-grid"></div>
+      <div class="bm-empty" id="bm-empty" hidden>还没有书签。</div>
+    </section>
+    <div class="toolbar">
+      <button id="bm-add" type="button">添加书签</button>
+      <button id="settings-open" type="button">设置</button>
+    </div>
+  </main>
+
+  <div class="modal-backdrop" id="bm-modal" hidden>
+    <form class="modal" id="bm-form">
+      <h3 id="bm-form-title">添加书签</h3>
+      <label>名称<input name="name" type="text"></label>
+      <label>网址<input name="url" type="text" required></label>
+      <p class="form-error" id="bm-form-error" hidden></p>
+      <div class="modal-actions">
+        <button type="submit">保存</button>
+        <button type="button" id="bm-cancel">取消</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="modal-backdrop" id="settings-modal" hidden>
+    <div class="modal settings">
+      <h3>设置</h3>
+      <section>
+        <h4>小组件</h4>
+        <label><input type="checkbox" id="toggle-clock"> 时钟</label>
+        <label><input type="checkbox" id="toggle-bookmarks"> 书签网格</label>
+      </section>
+      <section>
+        <h4>壁纸</h4>
+        <div class="wallpaper-list" id="wallpaper-list"></div>
+        <label class="upload-label">上传本地图片
+          <input type="file" id="wallpaper-upload" accept="image/*">
+        </label>
+      </section>
+      <section>
+        <h4>配置</h4>
+        <div class="config-actions">
+          <button type="button" id="config-export">导出 JSON</button>
+          <label class="btn-like">导入 JSON
+            <input type="file" id="config-import" accept="application/json,.json">
+          </label>
+        </div>
+      </section>
+      <div class="modal-actions">
+        <button type="button" id="settings-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <ol id="test-results"></ol>
+
+  <script>
+    // boot error capture: must attach before the app module runs
+    window.addEventListener('error', e => {
+      const d = document.createElement('div');
+      d.id = 'boot-error';
+      d.textContent = 'BOOT-ERROR: ' + String(e.message) + ' @ ' + String(e.filename) + ':' + String(e.lineno);
+      document.body.appendChild(d);
+    });
+    window.addEventListener('unhandledrejection', e => {
+      const d = document.createElement('div');
+      d.id = 'boot-error';
+      d.textContent = 'BOOT-REJECTION: ' + String(e.reason && e.reason.stack || e.reason);
+      document.body.appendChild(d);
+    });
+  </script>
+
+  <script type="module">
+    import './app.js';
+
+    const results = [];
+    function check(name, cond, detail) {
+      results.push({ name, ok: !!cond, detail });
+      const li = document.createElement('li');
+      li.textContent = (cond ? 'PASS ' : 'FAIL ') + name +
+        (cond || detail === undefined ? '' : ' :: ' + JSON.stringify(detail));
+      li.style.color = cond ? '#0a0' : '#d00';
+      document.getElementById('test-results').appendChild(li);
+    }
+    const $ = id => document.getElementById(id);
+    const gridItems = () => [...document.querySelectorAll('#bm-grid .bookmark')];
+    const activeWallpaper = () => window.mtab.wallpaperLayer();
+    const ruleFor = selector => {
+      for (const sheet of document.styleSheets) {
+        for (const rule of sheet.cssRules) {
+          if (rule.selectorText === selector) {
+            return rule;
+          }
+        }
+      }
+      return null;
+    };
+    // like ruleFor but walks into @media/@supports blocks too
+    const rulesWhere = pred => {
+      const found = [];
+      const walk = rules => {
+        for (const rule of rules) {
+          if (pred(rule)) {
+            found.push(rule);
+          }
+          if (rule.cssRules) {
+            walk(rule.cssRules);
+          }
+        }
+      };
+      for (const sheet of document.styleSheets) {
+        walk(sheet.cssRules);
+      }
+      return found;
+    };
+    const cs = el => getComputedStyle(el);
+
+    // Intercept new-tab navigation (bookmark clicks) so the harness stays put.
+    const opened = [];
+    window.open = (url, target) => { opened.push(url); return null; };
+
+    const tick = () => new Promise(r => setTimeout(r, 0));
+    // Poll until the condition holds. Bounded by ITERATIONS, not wall-clock:
+    // headless virtual time makes Date.now() deadlines unreliable (the loop
+    // would starve the virtual-time budget and hang the dump).
+    async function until(fn, maxIters = 150) {
+      for (let i = 0; i < maxIters; i++) {
+        if (fn()) {
+          return true;
+        }
+        await new Promise(r => setTimeout(r, 20));
+      }
+      return fn();
+    }
+
+    await new Promise(r => setTimeout(r, 50)); // let the app settle
+
+    // -- initial render --
+    check('clock visible by default', !$('clock').hidden);
+    check('clock date includes 星期', $('clock-date').textContent.includes('星期'));
+    check('search input autofocused', document.activeElement === $('search-input'));
+    check('bookmark empty state visible', !$('bm-empty').hidden);
+
+    // -- ui-polish: presentation assertions --
+    // 1.1 clock digit stability
+    check('clock uses tabular numerals',
+      cs($('clock-time')).fontVariantNumeric.includes('tabular-nums') &&
+      cs($('clock-time')).fontWeight === '300',
+      cs($('clock-time')).fontVariantNumeric);
+    const cw1 = $('clock-time').offsetWidth;
+    await new Promise(r => setTimeout(r, 1050)); // one virtual second passes
+    const cw2 = $('clock-time').offsetWidth;
+    check('clock width stable across a second tick', cw1 === cw2 && cw1 > 0,
+      { cw1, cw2 });
+    // 1.2 focus state
+    // NOTE: computed styles of TRANSITIONED properties freeze at their start
+    // value under headless virtual time, so assert the rule + focus behavior.
+    check('search input focus style rule',
+      ruleFor('#search-input:focus') &&
+      ruleFor('#search-input:focus').style.boxShadow.includes('rgba(255, 255, 255'));
+    const inp = $('search-input');
+    inp.focus();
+    check('search input receives focus', document.activeElement === inp);
+    // 1.3 scrim
+    const scrim = cs($('scrim'));
+    check('wallpaper scrim layer present',
+      scrim.backgroundImage.includes('gradient') && scrim.pointerEvents === 'none',
+      scrim.backgroundImage.slice(0, 40));
+    check('content layer above scrim',
+      cs($('app')).zIndex === '2' && scrim.zIndex === '1');
+    // 2.1 hover transitions (rules) + card lift
+    check('bookmark card hover lift rule',
+      ruleFor('.bookmark:hover') && ruleFor('.bookmark:hover').style.transform.includes('translateY'));
+    check('bookmark card transition includes transform',
+      ruleFor('.bookmark') &&
+      ruleFor('.bookmark').style.transitionProperty.includes('transform'));
+    check('delete button hover red rule',
+      ruleFor('.bm-ops .bm-delete:hover') &&
+      ruleFor('.bm-ops .bm-delete:hover').style.background.includes('200, 40, 40'));
+    check('engine pill hover rule', !!ruleFor('.engine-bar button:hover:not(.active)'));
+    // 2.2 search button micro-motion
+    check('search-go hover motion rule',
+      ruleFor('#search-go:hover') && ruleFor('#search-go:hover').style.transform.includes('translateY'));
+    check('search-go transition includes transform',
+      cs($('search-go')).transitionProperty.includes('transform'));
+    // 2.3 modal animation + backdrop blur
+    check('modal pop animation',
+      cs($('bm-modal').querySelector('.modal')).animationName === 'modal-pop');
+    check('modal backdrop has blur',
+      cs($('settings-modal')).backdropFilter.includes('blur'));
+    check('dead selector removed', !ruleFor('.modal-actions button secondary'));
+    // 2.4 empty state dashed
+    check('empty state dashed drop-zone style',
+      cs($('bm-empty')).borderStyle.includes('dashed'));
+    // 2.5 responsive grid
+    check('bookmark grid widened (880px at 1280 viewport)',
+      Math.round(parseFloat(cs($('bookmarks')).width)) === 880,
+      cs($('bookmarks')).width);
+    check('grid template uses 104px min tracks',
+      ruleFor('.bm-grid') &&
+      ruleFor('.bm-grid').style.gridTemplateColumns.includes('minmax(104px'));
+
+    // -- ui-a11y-polish: presentation assertions --
+    // 2.1 scrollbar styling
+    const sbTrack = rulesWhere(r => r.selectorText === '::-webkit-scrollbar');
+    check('webkit scrollbar track rules present',
+      sbTrack.length > 0 && sbTrack[0].style.width === '10px');
+    const sbThumb = rulesWhere(r => r.selectorText === '::-webkit-scrollbar-thumb');
+    check('webkit scrollbar thumb rounded and translucent',
+      sbThumb.length > 0 &&
+      sbThumb[0].style.borderRadius === '999px' &&
+      sbThumb[0].style.background.includes('255, 255, 255'));
+    // standard scrollbar props must only live inside @supports blocks
+    let stdInSupports = false;
+    let stdAtTopLevel = false;
+    for (const sheet of document.styleSheets) {
+      for (const rule of sheet.cssRules) {
+        if (rule instanceof CSSSupportsRule) {
+          for (const inner of rule.cssRules) {
+            if (inner.style && inner.style.scrollbarWidth) {
+              stdInSupports = true;
+            }
+          }
+        } else if (rule.style && rule.style.scrollbarWidth) {
+          stdAtTopLevel = true;
+        }
+      }
+    }
+    check('standard scrollbar props gated behind @supports',
+      stdInSupports && !stdAtTopLevel);
+    // 2.2 font stack
+    const bodyFont = cs(document.body).fontFamily;
+    check('font stack covers CN platforms and emoji',
+      bodyFont.includes('PingFang SC') && bodyFont.includes('Segoe UI Emoji'));
+    // 2.3 reduced-motion kill-switch rule (present regardless of preference)
+    const rmRule = rulesWhere(
+      r => r instanceof CSSMediaRule &&
+        r.media.mediaText.includes('prefers-reduced-motion: reduce'),
+    )[0];
+    check('reduced-motion kill-switch rule present',
+      !!rmRule && rmRule.cssRules.length > 0 &&
+      rmRule.cssRules[0].style.animationDuration === '0.01ms' &&
+      rmRule.cssRules[0].style.transitionDuration === '0.01ms');
+    // under --force-prefers-reduced-motion the effect itself is asserted;
+    // in a normal run this segment self-skips
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      check('reduced-motion zeroes wallpaper fade duration',
+        parseFloat(cs(document.querySelector('.wallpaper-layer')).transitionDuration) <= 0.001);
+      check('reduced-motion zeroes toast animation duration',
+        parseFloat(cs($('toast')).animationDuration) <= 0.001);
+    }
+    // 3.2 wallpaper layers exist and never intercept input
+    check('two wallpaper layers present, pointer-events none',
+      document.querySelectorAll('.wallpaper-layer').length === 2 &&
+      [...document.querySelectorAll('.wallpaper-layer')]
+        .every(l => cs(l).pointerEvents === 'none'));
+    check('initial wallpaper layer visible',
+      await until(() => activeWallpaper() &&
+        activeWallpaper().style.backgroundImage.includes('w1.svg') &&
+        activeWallpaper().classList.contains('visible')),
+      activeWallpaper() && activeWallpaper().className);
+
+    // -- bookmark add via real form --
+    $('bm-add').click();
+    check('add form opens', !$('bm-modal').hidden);
+    $('bm-form').elements.name.value = '示例站';
+    $('bm-form').elements.url.value = 'example.com';
+    $('bm-form').dispatchEvent(new Event('submit', { cancelable: true }));
+    check('form closes after submit', $('bm-modal').hidden);
+    await tick();
+    check('bookmark appears in grid', gridItems().length === 1);
+    check('grid resolves at least 6 columns with content',
+      cs($('bm-grid')).gridTemplateColumns.split(' ').filter(v => v !== '0px').length >= 6,
+      cs($('bm-grid')).gridTemplateColumns);
+    check('bookmark url normalized in title',
+      gridItems()[0].title === 'https://example.com');
+    const stored = JSON.parse(localStorage.getItem('mtab.config'));
+    check('save effect persisted to localStorage',
+      stored.bookmarks.length === 1 &&
+      stored.bookmarks[0].url === 'https://example.com', stored);
+
+    // -- bookmark icon fallback (bad favicon host) --
+    // simulate by adding a bookmark with an unreachable icon: rely on onerror
+    window.mtab.dispatch({ type: 'bookmark_add', name: '本地', url: 'http://localhost:9/nope' });
+    await new Promise(r => setTimeout(r, 200));
+    // favicon request fails async; the fallback replaces the img when it errors
+    const hasImgOrFallback = gridItems().every(b => b.querySelector('img') || b.querySelector('.bm-fallback'));
+    check('grid items render icon or fallback', hasImgOrFallback);
+
+    // -- bookmark edit via form --
+    const firstId = window.mtab.config.bookmarks[0].id;
+    gridItems()[0].querySelector('.bm-edit').click();
+    check('edit form opens with values', !$('bm-modal').hidden &&
+      $('bm-form').elements.url.value === 'https://example.com');
+    $('bm-form').elements.name.value = '改名了';
+    $('bm-form').elements.url.value = 'https://changed.example.com/path';
+    $('bm-form').dispatchEvent(new Event('submit', { cancelable: true }));
+    await tick();
+    check('edit reflected in grid',
+      gridItems()[0].querySelector('.bm-name').textContent === '改名了');
+
+    // -- invalid url via form -> notify (toast), no state change --
+    const beforeCount = window.mtab.config.bookmarks.length;
+    $('bm-add').click();
+    $('bm-form').elements.url.value = 'not a url';
+    $('bm-form').dispatchEvent(new Event('submit', { cancelable: true }));
+    check('invalid url shows toast', !$('toast').hidden, $('toast').textContent);
+    check('invalid url not added', window.mtab.config.bookmarks.length === beforeCount);
+    $('toast').hidden = true;
+
+    // -- bookmark click opens new tab --
+    gridItems()[0].click();
+    check('bookmark click opens url in new tab',
+      opened.includes('https://changed.example.com/path'), opened);
+
+    // -- bookmark delete --
+    const idsBeforeDelete = window.mtab.config.bookmarks.map(b => b.id).join(',');
+    gridItems()[0].querySelector('.bm-delete').click();
+    await until(() => gridItems().length === beforeCount - 1);
+    check('bookmark deleted from grid', gridItems().length === beforeCount - 1,
+      { count: gridItems().length, beforeCount, idsBeforeDelete,
+        after: window.mtab.config.bookmarks.map(b => b.id).join(','),
+        toast: $('toast').hidden ? null : $('toast').textContent });
+
+    // -- engine switch via click --
+    const bingBtn = [...document.querySelectorAll('#engine-bar button')]
+      .find(b => b.textContent === 'Bing');
+    bingBtn.click();
+    await tick();
+    check('engine switch moves active marker',
+      document.querySelector('#engine-bar button.active').textContent === 'Bing');
+    check('engine choice persisted',
+      JSON.parse(localStorage.getItem('mtab.config')).search.current === 'bing');
+
+    // -- empty search must not navigate --
+    window.mtab.dispatch({ type: 'search_submit', query: '   ' });
+    check('empty keyword does not navigate', location.href.includes('test-harness'));
+
+    // -- widget toggle via settings --
+    $('settings-open').click();
+    check('settings panel opens', !$('settings-modal').hidden);
+    $('toggle-clock').click();
+    await tick();
+    check('clock hidden after toggle', $('clock').hidden);
+    check('toggle persisted', JSON.parse(localStorage.getItem('mtab.config')).widgets.clock === false);
+    $('toggle-clock').click();
+    await tick();
+    check('clock restored', !$('clock').hidden);
+
+    // -- builtin wallpaper via click (crossfade, design D4) --
+    const w2 = document.querySelector('[data-wp="w2"]');
+    w2.click();
+    const fadedIn = await until(() => {
+      const l = activeWallpaper();
+      return l && l.style.backgroundImage.includes('w2.svg') &&
+        l.classList.contains('visible');
+    });
+    check('builtin wallpaper layer swapped with fade class', fadedIn,
+      activeWallpaper() && activeWallpaper().className);
+    const retired = await until(() =>
+      document.querySelectorAll('.wallpaper-layer.visible').length === 1);
+    check('previous wallpaper layer retired', retired);
+    check('wallpaper persisted',
+      JSON.parse(localStorage.getItem('mtab.config')).wallpaper.id === 'w2');
+    $('settings-close').click();
+    check('settings panel closes', $('settings-modal').hidden);
+
+    // -- upload wallpaper through the real handler (canvas compress) --
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 32;
+    canvas.getContext('2d').fillRect(0, 0, 64, 32);
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const imgFile = new File([blob], 'wall.png', { type: 'image/png' });
+    let bmpErr = 'n/a';
+    try {
+      const probe = await createImageBitmap(imgFile);
+      probe.close();
+      bmpErr = 'ok';
+    } catch (e) {
+      bmpErr = String(e);
+    }
+    check('createImageBitmap works headless', bmpErr === 'ok', bmpErr);
+    const dt = new DataTransfer();
+    dt.items.add(imgFile);
+    $('wallpaper-upload').files = dt.files;
+    $('wallpaper-upload').dispatchEvent(new Event('change'));
+    const uploaded = await until(() =>
+      activeWallpaper() &&
+      activeWallpaper().style.backgroundImage.startsWith('url("data:image/jpeg'));
+    check('uploaded wallpaper applied as data url', uploaded,
+      activeWallpaper() && activeWallpaper().style.backgroundImage.slice(0, 40));
+    check('custom wallpaper persisted',
+      JSON.parse(localStorage.getItem('mtab.config')).wallpaper.type === 'custom');
+
+    // -- crossfade degrade path (ui-a11y-polish D1): an undecodable image
+    // must apply immediately instead of blocking the wallpaper --
+    window.mtab.dispatch({ type: 'wallpaper_set_custom', data: 'data:image/png;base64,###' });
+    const brokenApplied = await until(() =>
+      activeWallpaper() &&
+      activeWallpaper().style.backgroundImage.includes('base64,###') &&
+      activeWallpaper().classList.contains('visible'));
+    check('undecodable wallpaper degrades to immediate apply', brokenApplied,
+      activeWallpaper() && activeWallpaper().className);
+
+    // -- toast semantics (ui-polish 3.1) --
+    // export success shows the green variant
+    $('settings-open').click();
+    $('config-export').click();
+    check('export toast uses success variant',
+      !$('toast').hidden && $('toast').classList.contains('success'),
+      $('toast').textContent);
+    $('toast').hidden = true;
+    $('toast').classList.remove('success');
+    $('settings-close').click();
+
+    // -- non-image upload rejected --
+    const txtFile = new File(['x'], 'a.txt', { type: 'text/plain' });
+    const dt2 = new DataTransfer();
+    dt2.items.add(txtFile);
+    const beforeBg = activeWallpaper() && activeWallpaper().style.backgroundImage;
+    $('wallpaper-upload').files = dt2.files;
+    $('wallpaper-upload').dispatchEvent(new Event('change'));
+    await new Promise(r => setTimeout(r, 100));
+    check('non-image upload rejected, wallpaper unchanged',
+      (activeWallpaper() && activeWallpaper().style.backgroundImage) === beforeBg &&
+      !$('toast').hidden && !$('toast').classList.contains('success'),
+      $('toast').textContent);
+
+    // -- import through the real file input --
+    const exportNow = JSON.stringify(window.mtab.config);
+    const modified = JSON.parse(exportNow);
+    modified.widgets.clock = false;
+    modified.bookmarks = [{ id: 'bx', name: '导入的', url: 'https://imported.example.com' }];
+    const cfgFile = new File([JSON.stringify(modified)], 'cfg.json', { type: 'application/json' });
+    const dt3 = new DataTransfer();
+    dt3.items.add(cfgFile);
+    $('config-import').files = dt3.files;
+    $('config-import').dispatchEvent(new Event('change'));
+    await until(() => window.mtab.config.bookmarks.length === 1 &&
+      window.mtab.config.bookmarks[0].name === '导入的');
+    check('import replaces bookmarks in grid',
+      gridItems().length === 1 &&
+        gridItems()[0].querySelector('.bm-name').textContent === '导入的',
+      gridItems().map(b => b.querySelector('.bm-name')?.textContent));
+    check('import hides clock per file', $('clock').hidden);
+
+    // -- invalid import keeps current state --
+    const before = JSON.stringify(window.mtab.config);
+    const badFile = new File(['{{broken'], 'bad.json', { type: 'application/json' });
+    const dt4 = new DataTransfer();
+    dt4.items.add(badFile);
+    $('config-import').files = dt4.files;
+    $('config-import').dispatchEvent(new Event('change'));
+    await new Promise(r => setTimeout(r, 200));
+    check('invalid import keeps config', JSON.stringify(window.mtab.config) === before);
+    check('invalid import shows toast', !$('toast').hidden);
+
+    const failed = results.filter(r => !r.ok).length;
+    const summary = document.createElement('p');
+    summary.id = 'test-summary';
+    summary.textContent = failed === 0
+      ? `ALL ${results.length} BROWSER CHECKS PASSED`
+      : `${failed} OF ${results.length} BROWSER CHECKS FAILED`;
+    summary.style.color = failed === 0 ? '#0a0' : '#d00';
+    document.getElementById('test-results').prepend(summary);
+    // Signal completion for dump-dom grep.
+    document.title = 'HARNESS-' + (failed === 0 ? 'PASS' : 'FAIL');
+  </script>
+</body>
+</html>
