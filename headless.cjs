@@ -34,21 +34,26 @@ const server = createServer(async (req, res) => {
   }
 });
 
+// Best-effort cleanup of all run profiles at startup. Each runEdge call
+// uses its own unique profile dir instead: a killed Edge can keep the
+// directory lock for a while, which would make a per-run rmSync fail
+// silently and leak localStorage between back-to-back runs.
+try {
+  rmSync(path.join(__dirname, '.edge-profile'), { recursive: true, force: true });
+} catch {}
+
+let runCounter = 0;
 function runEdge(args) {
   return new Promise((resolve) => {
-    // Fresh profile per run: persisted localStorage must not leak between runs.
-    // Tolerate EPERM/EBUSY when a killed Edge still holds the directory lock.
-    try {
-      rmSync(path.join(__dirname, '.edge-profile'), { recursive: true, force: true });
-    } catch {}
+    const profile = path.join(__dirname, '.edge-profile', `run-${++runCounter}`);
     console.log('  [edge] launching:', args.join(' '));
     const proc = spawn(EdgeExe(), [
       '--headless=new',
       '--disable-gpu',
       '--no-first-run',
       '--window-size=1280,800',
-      `--user-data-dir=${path.join(__dirname, '.edge-profile')}`,
-      '--virtual-time-budget=30000',
+      `--user-data-dir=${profile}`,
+      '--virtual-time-budget=60000',
       ...args,
     ]);
     let out = '';
