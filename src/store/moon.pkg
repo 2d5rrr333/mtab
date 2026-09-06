@@ -1,0 +1,9 @@
+// Package store: (state, event) -> (state, effects) core (design D1/D2).
+// Pure MoonBit: no FFI, fully covered by moon test.
+
+import {
+  "2d5rrr333/mtab/model",
+  "2d5rrr333/mtab/lunar",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+}

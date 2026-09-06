@@ -1,0 +1,56 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2d5rrr333/mtab/store"
+
+import {
+  "2d5rrr333/mtab/model",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn open(String?, String) -> Response
+
+pub fn update(Store, Event) -> Response
+
+// Errors
+
+// Types and methods
+pub(all) struct ClockView {
+  weekday : String
+  lunar : String?
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) enum Effect {
+  Save
+  OpenUrl(url~ : String)
+  NotifyError(message~ : String)
+} derive(Eq, @debug.Debug)
+pub impl ToJson for Effect
+
+pub(all) enum Event {
+  BookmarkAdd(name~ : String, url~ : String)
+  BookmarkEdit(id~ : String, name~ : String, url~ : String)
+  BookmarkDelete(id~ : String)
+  EngineSelect(id~ : String)
+  SearchSubmit(query~ : String)
+  WidgetToggle(widget~ : String)
+  WallpaperSetBuiltin(id~ : String)
+  WallpaperSetCustom(data~ : String)
+  ConfigImport(json~ : String)
+  TickDate(date~ : String)
+} derive(Eq, @debug.Debug)
+pub impl @json.FromJson for Event
+
+pub(all) struct Response {
+  state : Store
+  effects : Array[Effect]
+} derive(Eq, ToJson, @debug.Debug)
+
+pub(all) struct Store {
+  config : @model.Config
+  clock : ClockView?
+} derive(Eq, ToJson, @debug.Debug)
+
+// Type aliases
+
+// Traits
