@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2d5rrr333/mtab/lunar"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn solar_to_lunar(Int, Int, Int) -> LunarDate?
+
+pub fn weekday_name(Int, Int, Int) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct LunarDate {
+  year : Int
+  month : Int
+  is_leap_month : Bool
+  day : Int
+} derive(Eq, @debug.Debug)
+pub fn LunarDate::day_name(Self) -> String
+pub fn LunarDate::month_name(Self) -> String
+pub fn LunarDate::to_display(Self) -> String
+pub fn LunarDate::year_ganzhi(Self) -> String
+pub fn LunarDate::zodiac(Self) -> String
+
+// Type aliases
+
+// Traits

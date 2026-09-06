@@ -1,0 +1,2 @@
+// Package lunar: Gregorian to Chinese lunar calendar conversion, 1900-2100.
+// Pure functions only, no FFI (design D7).
