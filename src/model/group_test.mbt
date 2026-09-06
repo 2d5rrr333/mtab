@@ -7,7 +7,7 @@ fn bm(id : String, name : String, url : String) -> Bookmark {
 
 ///|
 fn grp(id : String, name : String, bookmarks : Array[Bookmark]) -> Group {
-  { id, name, bookmarks, }
+  { id, name, bookmarks, collapsed: false, }
 }
 
 ///|

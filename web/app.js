@@ -148,7 +148,18 @@ function renderAll() {
   renderEngineBar();
   renderBookmarks();
   applyWallpaper();
+  applyWallpaperBlur();
   syncSettingsControls();
+}
+
+/// Idempotently apply the persisted blur to both wallpaper layers
+/// (group-collapse-blur D2); 0 removes the filter. The bridge serializes
+/// the field as camelCase `wallpaperBlur` (hand-written ToJson).
+function applyWallpaperBlur() {
+  const n = config.wallpaperBlur || 0;
+  for (const layer of document.querySelectorAll('.wallpaper-layer')) {
+    layer.style.filter = n > 0 ? `blur(${n}px)` : '';
+  }
 }
 
 // clock: seconds tick locally; date line comes from wasm (design D4)
@@ -327,11 +338,17 @@ function renderBookmarks() {
 
 function groupNode(group) {
   const section = document.createElement('section');
-  section.className = 'bm-group';
+  section.className = 'bm-group' + (group.collapsed ? ' collapsed' : '');
   section.dataset.gid = group.id;
 
   const header = document.createElement('div');
   header.className = 'bm-group-header';
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'bm-group-toggle';
+  toggle.textContent = group.collapsed ? '▸' : '▾';
+  toggle.title = group.collapsed ? '展开分组' : '折叠分组';
+  header.appendChild(toggle);
   const drag = document.createElement('span');
   drag.className = 'bm-group-drag';
   drag.textContent = '⋮⋮';
@@ -664,6 +681,9 @@ function revealWallpaper(image, request) {
 function syncSettingsControls() {
   document.getElementById('toggle-clock').checked = config.widgets.clock;
   document.getElementById('toggle-bookmarks').checked = config.widgets.bookmarks;
+  document.getElementById('wallpaper-blur').value = String(config.wallpaperBlur || 0);
+  document.getElementById('wallpaper-blur-value').textContent =
+    String(config.wallpaperBlur || 0);
   const list = document.getElementById('wallpaper-list');
   for (const btn of list.querySelectorAll('button')) {
     const active =
@@ -850,6 +870,10 @@ function wireEvents() {
   const groupsEl = document.getElementById('bm-groups');
   groupsEl.addEventListener('click', e => {
     const groupSection = e.target.closest('.bm-group');
+    if (groupSection && e.target.closest('.bm-group-toggle')) {
+      dispatch({ type: 'group_toggle_collapse', id: groupSection.dataset.gid });
+      return;
+    }
     if (groupSection && e.target.closest('.bm-group-rename')) {
       const g = config.groups.find(g => g.id === groupSection.dataset.gid);
       if (g) {
@@ -923,6 +947,16 @@ function wireEvents() {
   document.getElementById('toggle-bookmarks').addEventListener('change', e => {
     dispatch({ type: 'widget_toggle', widget: 'bookmarks' });
     e.target.checked = config.widgets.bookmarks;
+  });
+
+  // settings: wallpaper blur slider (group-collapse-blur D2)
+  const blurSlider = document.getElementById('wallpaper-blur');
+  blurSlider.addEventListener('input', () => {
+    document.getElementById('wallpaper-blur-value').textContent =
+      blurSlider.value;
+  });
+  blurSlider.addEventListener('change', () => {
+    dispatch({ type: 'wallpaper_blur_set', amount: Number(blurSlider.value) });
   });
 
   // settings: wallpaper upload

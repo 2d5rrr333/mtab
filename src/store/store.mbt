@@ -152,6 +152,7 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
           id: @model.next_group_id(store.config.groups),
           name: trimmed,
           bookmarks: [],
+          collapsed: false,
         })
         ({ ..store, config: { ..store.config, groups, }, }, [Save])
       }
@@ -188,6 +189,34 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
           ({ ..store, config: { ..store.config, groups, }, }, [Save])
         None => (store, [NotifyError(message="要移动的分组不存在")])
       }
+    GroupToggleCollapse(id~) =>
+      if !group_exists(store.config.groups, id) {
+        (store, [NotifyError(message="要折叠的分组不存在")])
+      } else {
+        let groups = map_groups(store.config.groups, id, g => {
+          ..g,
+          collapsed: !g.collapsed,
+        })
+        ({ ..store, config: { ..store.config, groups, }, }, [Save])
+      }
+    WallpaperBlurSet(amount~) => {
+      // clamp to [0, WALLPAPER_BLUR_MAX]; no-op when unchanged
+      let clamped = if amount < 0 {
+        0
+      } else if amount > @model.WALLPAPER_BLUR_MAX {
+        @model.WALLPAPER_BLUR_MAX
+      } else {
+        amount
+      }
+      if clamped == store.config.wallpaper_blur {
+        (store, [])
+      } else {
+        (
+          { ..store, config: { ..store.config, wallpaper_blur: clamped, }, },
+          [Save],
+        )
+      }
+    }
     EngineSelect(id~) =>
       if store.config.search.engines.any(e => e.id == id) {
         (

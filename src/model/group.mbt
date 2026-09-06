@@ -7,18 +7,20 @@
 pub const DEFAULT_GROUP_ID : String = "g0"
 
 ///|
-/// A bookmark group: a named, ordered list of bookmarks.
+/// A bookmark group: a named, ordered list of bookmarks. `collapsed` is
+/// presentation-persisted UI state (group-collapse-blur D1).
 pub(all) struct Group {
   id : String
   name : String
   bookmarks : Array[Bookmark]
+  collapsed : Bool
 } derive(Eq, Debug)
 
 ///|
 /// Build the default group carrying `bookmarks` (v1 migration landing
 /// spot, bookmark fallback target).
 pub fn make_default_group(bookmarks : Array[Bookmark]) -> Group {
-  { id: DEFAULT_GROUP_ID, name: "默认分组", bookmarks, }
+  { id: DEFAULT_GROUP_ID, name: "默认分组", bookmarks, collapsed: false, }
 }
 
 ///|
@@ -68,7 +70,12 @@ fn numeric_gid_suffix(s : String) -> Int {
 
 ///|
 pub impl ToJson for Group with fn to_json(self) {
-  { "id": self.id, "name": self.name, "bookmarks": self.bookmarks }
+  {
+    "id": self.id,
+    "name": self.name,
+    "bookmarks": self.bookmarks,
+    "collapsed": self.collapsed,
+  }
 }
 
 ///|
@@ -85,5 +92,7 @@ pub impl FromJson for Group with fn from_json(
     id: str_field(map, "id", path),
     name: str_field(map, "name", path),
     bookmarks,
+    // old v2 files carry no collapsed flag: default expanded
+    collapsed: bool_field_opt(map, "collapsed"),
   }
 }

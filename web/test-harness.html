@@ -68,6 +68,9 @@
         <label class="upload-label">上传本地图片
           <input type="file" id="wallpaper-upload" accept="image/*">
         </label>
+        <label class="blur-label">壁纸模糊度 <span id="wallpaper-blur-value">0</span> px
+          <input type="range" id="wallpaper-blur" min="0" max="20" step="1" value="0">
+        </label>
       </section>
       <section>
         <h4>配置</h4>
@@ -455,6 +458,43 @@
     check('group delete falls bookmarks back into g0',
       groupState()[0].bookmarks.length >= 1,
       allBookmarkIds());
+    window.prompt = realPrompt;
+
+    // -- group collapse + wallpaper blur (group-collapse-blur) --
+    window.prompt = () => '折叠测试';
+    $('group-add').click();
+    await until(() => groupState().length === 2);
+    const g1section = () => groupSections()[1];
+    g1section().querySelector('.bm-group-toggle').click();
+    await until(() => groupState()[1].collapsed === true);
+    check('collapse hides the grid',
+      g1section().classList.contains('collapsed') &&
+      cs(g1section().querySelector('.bm-grid')).display === 'none');
+    check('collapse persisted',
+      JSON.parse(localStorage.getItem('mtab.config')).groups[1].collapsed === true);
+    g1section().querySelector('.bm-group-toggle').click();
+    await until(() => groupState()[1].collapsed === false);
+    check('expand restores the grid',
+      !g1section().classList.contains('collapsed') &&
+      cs(g1section().querySelector('.bm-grid')).display === 'grid');
+    // wallpaper blur: slider drives the store and the layers
+    $('settings-open').click();
+    const blurSlider = $('wallpaper-blur');
+    blurSlider.value = '8';
+    blurSlider.dispatchEvent(new Event('change', { bubbles: true }));
+    await until(() => window.mtab.config.wallpaperBlur === 8);
+    check('blur slider persists amount',
+      JSON.parse(localStorage.getItem('mtab.config')).wallpaperBlur === 8);
+    check('wallpaper layers carry the blur filter',
+      [...document.querySelectorAll('.wallpaper-layer')]
+        .every(l => l.style.filter === 'blur(8px)'));
+    blurSlider.value = '0';
+    blurSlider.dispatchEvent(new Event('change', { bubbles: true }));
+    await until(() => window.mtab.config.wallpaperBlur === 0);
+    check('blur 0 removes the filter',
+      [...document.querySelectorAll('.wallpaper-layer')]
+        .every(l => l.style.filter === ''));
+    $('settings-close').click();
     window.prompt = realPrompt;
 
     // -- engine switch via click --

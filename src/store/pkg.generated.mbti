@@ -42,6 +42,8 @@ pub(all) enum Event {
   GroupRename(id~ : String, name~ : String)
   GroupDelete(id~ : String)
   GroupMove(id~ : String, to_index~ : Int)
+  GroupToggleCollapse(id~ : String)
+  WallpaperBlurSet(amount~ : Int)
   EngineSelect(id~ : String)
   SearchInput(query~ : String, at~ : Int64?)
   SearchSubmit(query~ : String, at~ : Int64?)

@@ -15,7 +15,12 @@ pub(all) struct Config {
   search : SearchConfig
   widgets : WidgetsConfig
   wallpaper : Wallpaper
+  wallpaper_blur : Int
 } derive(Eq, Debug)
+
+///|
+/// Upper bound for wallpaper blur in px (group-collapse-blur D2).
+pub const WALLPAPER_BLUR_MAX : Int = 20
 
 ///|
 pub impl ToJson for Config with fn to_json(self) {
@@ -25,6 +30,7 @@ pub impl ToJson for Config with fn to_json(self) {
     "search": self.search,
     "widgets": self.widgets,
     "wallpaper": self.wallpaper,
+    "wallpaperBlur": self.wallpaper_blur,
   }
 }
 
@@ -66,6 +72,8 @@ pub impl FromJson for Config with fn from_json(
     search: @json.from_json(field(map, "search", path)),
     widgets: @json.from_json(field(map, "widgets", path)),
     wallpaper: @json.from_json(field(map, "wallpaper", path)),
+    // old files carry no blur amount: default 0
+    wallpaper_blur: int_field_opt(map, "wallpaperBlur"),
   }
 }
 
@@ -99,6 +107,7 @@ pub fn Config::default() -> Config {
     },
     widgets: { clock: true, bookmarks: true, },
     wallpaper: Builtin("w1"),
+    wallpaper_blur: 0,
   }
 }
 

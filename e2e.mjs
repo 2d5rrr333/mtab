@@ -152,6 +152,25 @@ check('g0 delete is refused', rg.effects[0].type === 'notify_error');
 rg = JSON.parse(mtabG.mtab_dispatch('{"type":"group_rename","id":"g0","name":"x"}'));
 check('g0 rename is refused', rg.effects[0].type === 'notify_error');
 
+// -- group collapse + wallpaper blur (group-collapse-blur change) --
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"group_add","name":"可折叠"}'));
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"group_toggle_collapse","id":"g1"}'));
+check('collapse toggles on and saves',
+  rg.state.config.groups[1].collapsed === true && rg.effects[0].type === 'save');
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"group_toggle_collapse","id":"g1"}'));
+check('collapse toggles back off',
+  rg.state.config.groups[1].collapsed === false);
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"group_toggle_collapse","id":"zz"}'));
+check('collapse of missing group notifies', rg.effects[0].type === 'notify_error');
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"wallpaper_blur_set","amount":99}'));
+check('blur clamps to 20 and saves',
+  rg.state.config.wallpaperBlur === 20 && rg.effects[0].type === 'save');
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"wallpaper_blur_set","amount":-5}'));
+check('blur clamps to 0',
+  rg.state.config.wallpaperBlur === 0 && rg.effects[0].type === 'save');
+rg = JSON.parse(mtabG.mtab_dispatch('{"type":"wallpaper_blur_set","amount":0}'));
+check('blur no-op when unchanged', rg.effects.length === 0);
+
 // -- solar terms & festivals (solar-terms-festivals change) --
 // fresh instance on a festival day: 2025-01-29 春节 (festival wins)
 const mod3 = new WebAssembly.Module(bytes, { builtins: ['js-string'] });

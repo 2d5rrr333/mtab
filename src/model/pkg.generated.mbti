@@ -11,11 +11,17 @@ pub const CONFIG_VERSION : Int = 2
 
 pub const DEFAULT_GROUP_ID : String = "g0"
 
+pub const WALLPAPER_BLUR_MAX : Int = 20
+
+pub fn bool_field_opt(Map[String, Json], String) -> Bool
+
 pub fn ensure_groups_valid(Array[Group]) -> Array[Group]
 
 pub fn expect_object(Json, @json.JsonPath) -> Map[String, Json] raise @json.JsonDecodeError
 
 pub fn int_field(Map[String, Json], String, @json.JsonPath) -> Int raise @json.JsonDecodeError
+
+pub fn int_field_opt(Map[String, Json], String) -> Int
 
 pub fn make_default_group(Array[Bookmark]) -> Group
 
@@ -46,6 +52,7 @@ pub(all) struct Config {
   search : SearchConfig
   widgets : WidgetsConfig
   wallpaper : Wallpaper
+  wallpaper_blur : Int
 } derive(Eq, @debug.Debug)
 pub fn Config::decode(String) -> Self raise
 pub fn Config::default() -> Self
@@ -65,6 +72,7 @@ pub(all) struct Group {
   id : String
   name : String
   bookmarks : Array[Bookmark]
+  collapsed : Bool
 } derive(Eq, @debug.Debug)
 pub impl ToJson for Group
 pub impl @json.FromJson for Group

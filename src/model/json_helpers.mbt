@@ -85,6 +85,25 @@ pub fn str_field_opt(map : Map[String, Json], key : String) -> String? {
 }
 
 ///|
+/// Optional boolean field: absent or non-boolean -> `fallback`.
+pub fn bool_field_opt(map : Map[String, Json], key : String) -> Bool {
+  match map.get(key) {
+    Some(True) => true
+    Some(False) => false
+    _ => false
+  }
+}
+
+///|
+/// Optional integer field: absent or non-number -> `fallback`.
+pub fn int_field_opt(map : Map[String, Json], key : String) -> Int {
+  match map.get(key) {
+    Some(Number(n, ..)) => n.to_int()
+    _ => 0
+  }
+}
+
+///|
 fn bool_field(
   map : Map[String, Json],
   key : String,
