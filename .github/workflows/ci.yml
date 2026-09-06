@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MoonBit toolchain
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Toolchain version
+        run: moon version --all
+
+      - name: Check
+        run: moon check
+
+      - name: Format
+        run: moon fmt --check
+
+      - name: Unit tests
+        run: moon test
+
+      - name: Build wasm (release)
+        run: pwsh ./build.ps1 -Release
+
+      - name: E2E over the FFI bridge
+        run: node e2e.mjs
+
+      - name: Upload web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: mtab-web
+          path: web
