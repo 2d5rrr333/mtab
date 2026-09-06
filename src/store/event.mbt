@@ -13,6 +13,7 @@ pub(all) enum Event {
   GroupMove(id~ : String, to_index~ : Int)
   GroupToggleCollapse(id~ : String)
   WallpaperBlurSet(amount~ : Int)
+  ThemeSet(theme~ : String)
   EngineSelect(id~ : String)
   SearchInput(query~ : String, at~ : Int64?)
   SearchSubmit(query~ : String, at~ : Int64?)
@@ -82,6 +83,7 @@ pub impl FromJson for Event with fn from_json(
       GroupToggleCollapse(id=@model.str_field(map, "id", path))
     "wallpaper_blur_set" =>
       WallpaperBlurSet(amount=@model.int_field(map, "amount", path))
+    "theme_set" => ThemeSet(theme=@model.str_field(map, "theme", path))
     "engine_select" => EngineSelect(id=@model.str_field(map, "id", path))
     "search_input" =>
       SearchInput(query=@model.str_field(map, "query", path), at=at_field(map))

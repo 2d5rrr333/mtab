@@ -1,5 +1,54 @@
 /* mtab styles: polished presentation layer (ui-polish change). */
 
+/* ---- design tokens (theme-system D1) ---- */
+/* dark is the default palette; [data-theme="light"] overrides below. */
+
+:root {
+  --bg: #1c1e26;
+  --text: #f5f5f5;
+  --text-dim: rgba(255, 255, 255, 0.6);
+  --text-on-accent: #222;
+  --surface: rgba(255, 255, 255, 0.14);
+  --surface-weak: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.24);
+  --accent: rgba(255, 255, 255, 0.85);
+  --accent-solid: #fff;
+  --border: rgba(255, 255, 255, 0.35);
+  --divider: rgba(255, 255, 255, 0.12);
+  --panel: #2a2d38;
+  --panel-90: rgba(30, 33, 42, 0.92);
+  --focus-ring: rgba(255, 255, 255, 0.15);
+  --outline: rgba(255, 255, 255, 0.7);
+  --sb-thumb: rgba(255, 255, 255, 0.28);
+  --sb-thumb-hover: rgba(255, 255, 255, 0.45);
+  --scrim-mid: rgba(0, 0, 0, 0.16);
+  --scrim-edge: rgba(0, 0, 0, 0.44);
+  --badge-term-bg: rgba(255, 255, 255, 0.16);
+}
+
+[data-theme="light"] {
+  --bg: #eef0f5;
+  --text: #23252e;
+  --text-dim: rgba(0, 0, 0, 0.55);
+  --text-on-accent: #fff;
+  --surface: rgba(255, 255, 255, 0.66);
+  --surface-weak: rgba(255, 255, 255, 0.4);
+  --surface-hover: rgba(255, 255, 255, 0.88);
+  --accent: rgba(35, 37, 46, 0.92);
+  --accent-solid: #2a2d38;
+  --border: rgba(0, 0, 0, 0.18);
+  --divider: rgba(0, 0, 0, 0.08);
+  --panel: #ffffff;
+  --panel-90: rgba(255, 255, 255, 0.94);
+  --focus-ring: rgba(35, 37, 46, 0.18);
+  --outline: rgba(35, 37, 46, 0.55);
+  --sb-thumb: rgba(0, 0, 0, 0.3);
+  --sb-thumb-hover: rgba(0, 0, 0, 0.45);
+  --scrim-mid: rgba(255, 255, 255, 0.28);
+  --scrim-edge: rgba(255, 255, 255, 0.55);
+  --badge-term-bg: rgba(255, 255, 255, 0.55);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -26,8 +75,8 @@ body {
     'Apple Color Emoji',
     'Segoe UI Emoji',
     'Noto Color Emoji';
-  color: #f5f5f5;
-  background: #1c1e26;
+  color: var(--text);
+  background: var(--bg);
 }
 
 /* ---- scrollbar (ui-a11y-polish D2) ---- */
@@ -46,20 +95,21 @@ body {
 
 ::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.28);
+  /* longhand: shorthand+var() serializes empty in CSSOM */
+  background-color: var(--sb-thumb);
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.45);
+  background-color: var(--sb-thumb-hover);
   background-clip: content-box;
 }
 
 @supports not selector(::-webkit-scrollbar) {
   html {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+    scrollbar-color: var(--sb-thumb-hover) transparent;
   }
 }
 
@@ -90,8 +140,8 @@ body {
   pointer-events: none;
   background: radial-gradient(
     ellipse at center,
-    rgba(0, 0, 0, 0.16) 0%,
-    rgba(0, 0, 0, 0.44) 100%
+    var(--scrim-mid) 0%,
+    var(--scrim-edge) 100%
   );
 }
 
@@ -141,15 +191,15 @@ body {
 }
 
 .clock-badge.badge-term {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--badge-term-bg);
   color: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .clock-badge.badge-term:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--surface-hover);
 }
 
 .clock-badge.badge-festival {
@@ -204,9 +254,9 @@ body {
 
 .engine-bar button {
   padding: 0.25rem 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--surface);
   color: inherit;
   cursor: pointer;
   font-size: 0.9rem;
@@ -216,12 +266,12 @@ body {
 }
 
 .engine-bar button:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.26);
+  background: var(--surface-hover);
 }
 
 .engine-bar button.active {
-  background: rgba(255, 255, 255, 0.85);
-  color: #222;
+  background: var(--accent);
+  color: var(--text-on-accent);
   border-color: transparent;
 }
 
@@ -234,8 +284,8 @@ body {
   flex: 1;
   padding: 0.75rem 1.1rem;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border);
+  background: var(--surface);
   backdrop-filter: blur(6px);
   color: inherit;
   font-size: 1rem;
@@ -248,22 +298,22 @@ body {
 }
 
 #search-input:focus {
-  border-color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+  border-color: var(--accent);
+  background: var(--surface-hover);
+  box-shadow: 0 0 0 3px var(--focus-ring);
   transform: translateY(-1px);
 }
 
 #search-input::placeholder {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-dim);
 }
 
 #search-go {
   padding: 0 1.2rem;
   border-radius: 10px;
   border: none;
-  background: rgba(255, 255, 255, 0.85);
-  color: #222;
+  background: var(--accent);
+  color: var(--text-on-accent);
   font-size: 1rem;
   cursor: pointer;
   transition:
@@ -272,12 +322,12 @@ body {
 }
 
 #search-go:hover {
-  background: #fff;
+  background: var(--accent-solid);
   transform: translateY(-1px);
 }
 
 #search-go:active {
-  background: rgba(255, 255, 255, 0.75);
+  background: var(--accent);
   transform: translateY(0);
 }
 
@@ -293,9 +343,9 @@ body {
   left: 0;
   right: 92px;
   z-index: 5;
-  background: rgba(30, 33, 42, 0.92);
+  background: var(--panel-90);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
   overflow: hidden;
@@ -343,7 +393,7 @@ body {
 .suggest-item .suggest-del {
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-dim);
   border-radius: 6px;
   width: 20px;
   height: 20px;
@@ -361,7 +411,7 @@ body {
 
 .suggest-item:hover,
 .suggest-item.active {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--surface);
 }
 
 .suggest-item:hover {
@@ -373,12 +423,12 @@ body {
 }
 
 .suggest-item.active {
-  box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.7);
+  box-shadow: inset 2px 0 0 var(--outline);
 }
 
 /* keyboard focus outline for everything without a custom focus style */
 :where(button, input):focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline: 2px solid var(--outline);
   outline-offset: 2px;
 }
 
@@ -402,7 +452,7 @@ body {
   gap: 0.5rem;
   padding: 1rem 0.4rem 0.7rem;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--surface);
   cursor: pointer;
   border: 1px solid transparent;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
@@ -413,7 +463,7 @@ body {
 }
 
 .bookmark:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--surface-hover);
   transform: translateY(-3px);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
 }
@@ -427,7 +477,7 @@ body {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -485,8 +535,11 @@ body {
   text-align: center;
   padding: 2rem;
   border-radius: 12px;
-  border: 1.5px dashed rgba(255, 255, 255, 0.32);
-  background: rgba(255, 255, 255, 0.06);
+  /* longhands: shorthands with var() serialize empty in CSSOM */
+  border-width: 1.5px;
+  border-style: dashed;
+  border-color: var(--border);
+  background: var(--surface-weak);
   opacity: 0.85;
 }
 
@@ -501,7 +554,7 @@ body {
 .ghost-btn {
   padding: 0.3rem 0.9rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--border);
   background: transparent;
   color: inherit;
   font-size: 0.82rem;
@@ -510,7 +563,7 @@ body {
 }
 
 .ghost-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--surface);
 }
 
 .bm-group {
@@ -575,8 +628,8 @@ body {
   text-align: center;
   padding: 0.9rem;
   border-radius: 10px;
-  border: 1px dashed rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed var(--border);
+  background: var(--surface-weak);
   font-size: 0.8rem;
   opacity: 0.7;
 }
@@ -605,7 +658,36 @@ body {
 
 .blur-label input[type='range'] {
   width: 100%;
-  accent-color: rgba(255, 255, 255, 0.85);
+  accent-color: var(--accent-solid);
+}
+
+/* ---- theme picker (theme-system D3) ---- */
+
+.theme-picker {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.theme-picker button {
+  flex: 1;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.theme-picker button:hover {
+  background: var(--surface-hover);
+}
+
+.theme-picker button.active {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: transparent;
 }
 
 /* ---- pointer drag (bookmark-groups design D3) ---- */
@@ -636,7 +718,7 @@ body.dragging .bm-ops {
   bottom: 8%;
   width: 3px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--accent);
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
 }
 
@@ -664,7 +746,7 @@ body.dragging .bm-ops {
   padding: 0.5rem 1rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--surface);
   color: inherit;
   cursor: pointer;
   backdrop-filter: blur(6px);
@@ -672,7 +754,7 @@ body.dragging .bm-ops {
 }
 
 .toolbar button:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--surface-hover);
 }
 
 /* ---- modals ---- */
@@ -697,7 +779,7 @@ body.dragging .bm-ops {
   width: min(420px, 92vw);
   max-height: 86vh;
   overflow-y: auto;
-  background: #2a2d38;
+  background: var(--panel);
   border-radius: 14px;
   padding: 1.4rem 1.6rem;
   display: flex;
@@ -729,7 +811,7 @@ body.dragging .bm-ops {
   flex-direction: column;
   gap: 0.5rem;
   padding-top: 0.6rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid var(--surface);
 }
 
 .modal h4 {
@@ -748,8 +830,8 @@ body.dragging .bm-ops {
 .modal input[type='text'] {
   padding: 0.55rem 0.7rem;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: inherit;
   outline: none;
 }
@@ -770,8 +852,8 @@ body.dragging .bm-ops {
   padding: 0.5rem 1.1rem;
   border-radius: 8px;
   border: none;
-  background: rgba(255, 255, 255, 0.85);
-  color: #222;
+  background: var(--accent);
+  color: var(--text-on-accent);
   cursor: pointer;
   font-size: 0.9rem;
   text-align: center;
@@ -782,12 +864,12 @@ body.dragging .bm-ops {
 
 .modal-actions button:hover,
 .btn-like:hover {
-  background: #fff;
+  background: var(--accent-solid);
 }
 
 .modal-actions button[type='button'],
 .modal-actions button[type='button']:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--border);
   color: inherit;
 }
 
@@ -815,7 +897,7 @@ body.dragging .bm-ops {
 }
 
 .wallpaper-list button.active {
-  border-color: #fff;
+  border-color: var(--accent-solid);
 }
 
 .upload-label input[type='file'],

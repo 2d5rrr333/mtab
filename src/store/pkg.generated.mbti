@@ -44,6 +44,7 @@ pub(all) enum Event {
   GroupMove(id~ : String, to_index~ : Int)
   GroupToggleCollapse(id~ : String)
   WallpaperBlurSet(amount~ : Int)
+  ThemeSet(theme~ : String)
   EngineSelect(id~ : String)
   SearchInput(query~ : String, at~ : Int64?)
   SearchSubmit(query~ : String, at~ : Int64?)

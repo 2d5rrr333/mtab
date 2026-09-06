@@ -16,6 +16,7 @@ pub(all) struct Config {
   widgets : WidgetsConfig
   wallpaper : Wallpaper
   wallpaper_blur : Int
+  theme : String
 } derive(Eq, Debug)
 
 ///|
@@ -31,6 +32,7 @@ pub impl ToJson for Config with fn to_json(self) {
     "widgets": self.widgets,
     "wallpaper": self.wallpaper,
     "wallpaperBlur": self.wallpaper_blur,
+    "theme": self.theme,
   }
 }
 
@@ -74,6 +76,18 @@ pub impl FromJson for Config with fn from_json(
     wallpaper: @json.from_json(field(map, "wallpaper", path)),
     // old files carry no blur amount: default 0
     wallpaper_blur: int_field_opt(map, "wallpaperBlur"),
+    // old files carry no theme: default dark (theme-system D2)
+    theme: theme_field(map),
+  }
+}
+
+///|
+/// Theme field: "dark" | "light" | "auto"; absent/invalid -> "dark".
+fn theme_field(map : Map[String, Json]) -> String {
+  match map.get("theme") {
+    Some(String("light")) => "light"
+    Some(String("auto")) => "auto"
+    _ => "dark"
   }
 }
 
@@ -108,6 +122,7 @@ pub fn Config::default() -> Config {
     widgets: { clock: true, bookmarks: true, },
     wallpaper: Builtin("w1"),
     wallpaper_blur: 0,
+    theme: "dark",
   }
 }
 

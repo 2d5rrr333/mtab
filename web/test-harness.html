@@ -58,6 +58,14 @@
     <div class="modal settings">
       <h3>设置</h3>
       <section>
+        <h4>外观</h4>
+        <div class="theme-picker" id="theme-picker">
+          <button type="button" data-theme-set="dark">深色</button>
+          <button type="button" data-theme-set="light">浅色</button>
+          <button type="button" data-theme-set="auto">跟随系统</button>
+        </div>
+      </section>
+      <section>
         <h4>小组件</h4>
         <label><input type="checkbox" id="toggle-clock"> 时钟</label>
         <label><input type="checkbox" id="toggle-bookmarks"> 书签网格</label>
@@ -230,7 +238,7 @@
     // value under headless virtual time, so assert the rule + focus behavior.
     check('search input focus style rule',
       ruleFor('#search-input:focus') &&
-      ruleFor('#search-input:focus').style.boxShadow.includes('rgba(255, 255, 255'));
+      ruleFor('#search-input:focus').style.boxShadow !== '');
     const inp = $('search-input');
     inp.focus();
     check('search input receives focus', document.activeElement === inp);
@@ -282,7 +290,7 @@
     check('webkit scrollbar thumb rounded and translucent',
       sbThumb.length > 0 &&
       sbThumb[0].style.borderRadius === '999px' &&
-      sbThumb[0].style.background.includes('255, 255, 255'));
+      sbThumb[0].cssText.includes('var(--sb-thumb)'));
     // standard scrollbar props must only live inside @supports blocks
     let stdInSupports = false;
     let stdAtTopLevel = false;
@@ -496,6 +504,34 @@
         .every(l => l.style.filter === ''));
     $('settings-close').click();
     window.prompt = realPrompt;
+
+    // -- theme system (theme-system change) --
+    // light theme: rule block + click applies + persists
+    check('light theme token block exists',
+      rulesWhere(r => r.selectorText === '[data-theme="light"]').length > 0);
+    $('settings-open').click();
+    const themeBtn = v => document.querySelector(`#theme-picker [data-theme-set="${v}"]`);
+    themeBtn('light').click();
+    await until(() => (window.mtab.config.theme || 'dark') === 'light');
+    check('light theme applies to <html>',
+      document.documentElement.dataset.theme === 'light');
+    check('light theme persisted and button active',
+      JSON.parse(localStorage.getItem('mtab.config')).theme === 'light' &&
+      themeBtn('light').classList.contains('active'));
+    // dark restores
+    themeBtn('dark').click();
+    await until(() => window.mtab.config.theme === 'dark');
+    check('dark theme restores', document.documentElement.dataset.theme === 'dark');
+    // auto resolves via matchMedia
+    themeBtn('auto').click();
+    await until(() => (window.mtab.config.theme || 'dark') === 'auto');
+    check('auto theme resolves to the system scheme',
+      document.documentElement.dataset.theme ===
+        (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
+    // back to dark for the rest of the run
+    themeBtn('dark').click();
+    await until(() => window.mtab.config.theme === 'dark');
+    $('settings-close').click();
 
     // -- engine switch via click --
     const bingBtn = [...document.querySelectorAll('#engine-bar button')]

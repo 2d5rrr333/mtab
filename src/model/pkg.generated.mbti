@@ -53,6 +53,7 @@ pub(all) struct Config {
   widgets : WidgetsConfig
   wallpaper : Wallpaper
   wallpaper_blur : Int
+  theme : String
 } derive(Eq, @debug.Debug)
 pub fn Config::decode(String) -> Self raise
 pub fn Config::default() -> Self

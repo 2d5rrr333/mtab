@@ -217,6 +217,16 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
         )
       }
     }
+    ThemeSet(theme~) =>
+      if theme == "dark" || theme == "light" || theme == "auto" {
+        if theme == store.config.theme {
+          (store, [])
+        } else {
+          ({ ..store, config: { ..store.config, theme, }, }, [Save])
+        }
+      } else {
+        (store, [NotifyError(message="不支持的主题")])
+      }
     EngineSelect(id~) =>
       if store.config.search.engines.any(e => e.id == id) {
         (

@@ -149,8 +149,30 @@ function renderAll() {
   renderBookmarks();
   applyWallpaper();
   applyWallpaperBlur();
+  applyTheme();
   syncSettingsControls();
 }
+
+/// Theme resolution and application (theme-system D2): "auto" follows the
+/// system color scheme; the resolved value lands on <html data-theme>.
+function resolveTheme() {
+  const theme = config.theme || 'dark';
+  if (theme !== 'auto') {
+    return theme;
+  }
+  return matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = resolveTheme();
+}
+
+// live-follow system switches while in auto (one-time listener)
+matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+  if ((config.theme || 'dark') === 'auto') {
+    applyTheme();
+  }
+});
 
 /// Idempotently apply the persisted blur to both wallpaper layers
 /// (group-collapse-blur D2); 0 removes the filter. The bridge serializes
@@ -684,6 +706,10 @@ function syncSettingsControls() {
   document.getElementById('wallpaper-blur').value = String(config.wallpaperBlur || 0);
   document.getElementById('wallpaper-blur-value').textContent =
     String(config.wallpaperBlur || 0);
+  const theme = config.theme || 'dark';
+  for (const btn of document.querySelectorAll('#theme-picker button')) {
+    btn.classList.toggle('active', btn.dataset.themeSet === theme);
+  }
   const list = document.getElementById('wallpaper-list');
   for (const btn of list.querySelectorAll('button')) {
     const active =
@@ -948,6 +974,13 @@ function wireEvents() {
     dispatch({ type: 'widget_toggle', widget: 'bookmarks' });
     e.target.checked = config.widgets.bookmarks;
   });
+
+  // settings: theme picker (theme-system D3)
+  for (const btn of document.querySelectorAll('#theme-picker button')) {
+    btn.addEventListener('click', () => {
+      dispatch({ type: 'theme_set', theme: btn.dataset.themeSet });
+    });
+  }
 
   // settings: wallpaper blur slider (group-collapse-blur D2)
   const blurSlider = document.getElementById('wallpaper-blur');
