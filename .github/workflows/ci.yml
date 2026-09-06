@@ -14,10 +14,12 @@ jobs:
       - name: Install MoonBit toolchain
         # Pin to the toolchain the codebase is verified against; `latest`
         # may drift (moon exits -1/255 on failure, hard to attribute).
-        # 0.1.20260827 bundles moonc v0.10.11 whose canonical style
-        # (struct-literal trailing commas) matches the verified source.
+        # No CI fmt gate: 0.1.20260827 has no linux build, and 0.1.20260819
+        # formats .mbt differently per platform (its linux moonc adds
+        # struct-literal trailing commas, its windows one strips them).
+        # Run `moon fmt --check` locally instead (toolchain 0.1.20260827).
         env:
-          MOONBIT_INSTALL_VERSION: 0.1.20260827
+          MOONBIT_INSTALL_VERSION: 0.1.20260819
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
@@ -27,9 +29,6 @@ jobs:
 
       - name: Check
         run: moon check
-
-      - name: Format check
-        run: moon fmt --check
 
       - name: Unit tests
         run: moon test
