@@ -1,0 +1,15 @@
+// mtab wasm FFI surface (design D1/D2): the only package in the web artifact.
+//
+// Exports mtab_init/mtab_dispatch over the bridge. JS passes/stores config
+// JSON text; responses are the Response envelope (state + effects).
+
+import {
+  "2d5rrr333/mtab/store",
+  "moonbitlang/core/json",
+}
+
+pkgtype(kind: "foreign_library")
+
+options(
+  link: { "wasm-gc": { "use-js-builtin-string": true } },
+)

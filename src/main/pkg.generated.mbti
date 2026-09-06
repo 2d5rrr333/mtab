@@ -1,0 +1,15 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2d5rrr333/mtab/main"
+
+// Values
+pub fn mtab_dispatch(String) -> String
+
+pub fn mtab_init(String, String) -> String
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
