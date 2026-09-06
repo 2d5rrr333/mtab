@@ -11,8 +11,15 @@ test "open with no stored config yields the default config" {
 test "open computes weekday and lunar for today (task 3.2)" {
   let resp = @store.open(None, "2025-01-29")
   assert_true(
-    resp.state.clock
-    is Some({ weekday: "星期三", lunar: Some("乙巳年正月初一"), }),
+    resp.state.clock // festival wins the display slot
+    is Some(
+      {
+        weekday: "星期三",
+        lunar: Some("乙巳年正月初一"),
+        festival: Some("春节"),
+        solar_term: None,
+      }
+    ),
   )
 }
 
@@ -21,8 +28,15 @@ test "tick_date recomputes the clock without saving (task 3.2)" {
   let base = @store.open(None, "2025-01-29").state
   let resp = @store.update(base, TickDate(date="2025-07-25"))
   assert_true(
-    resp.state.clock
-    is Some({ weekday: "星期五", lunar: Some("乙巳年闰六月初一"), }),
+    resp.state.clock // 2025-07-25 (闰六月初一) is not a term day
+    is Some(
+      {
+        weekday: "星期五",
+        lunar: Some("乙巳年闰六月初一"),
+        festival: None,
+        solar_term: None,
+      }
+    ),
   )
   assert_eq(resp.effects, [])
   // Display-only: config untouched.

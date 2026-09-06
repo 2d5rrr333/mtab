@@ -440,6 +440,27 @@
     check('focus after clear shows no suggestions',
       suggestBox.hidden || suggestItems().length === 0);
 
+    // -- solar term / festival in the date line (solar-terms-festivals) --
+    // drive a known term day through the real tick_date path
+    window.mtab.dispatch({ type: 'tick_date', date: '2025-10-08' });
+    await tick();
+    check('date line shows 寒露 on term day',
+      $('clock-date').textContent.includes('寒露'));
+    // festival day: festival wins (春节 2025-01-29, also no term that day)
+    window.mtab.dispatch({ type: 'tick_date', date: '2025-01-29' });
+    await tick();
+    check('date line shows 春节 festival',
+      $('clock-date').textContent.includes('春节'));
+    // ordinary day: neither term nor festival appears
+    window.mtab.dispatch({ type: 'tick_date', date: '2025-10-07' });
+    await tick();
+    check('date line plain on ordinary day',
+      !$('clock-date').textContent.includes('寒露') &&
+      !$('clock-date').textContent.includes('春节'));
+    // restore today so later wallpaper/other checks are unaffected
+    window.mtab.dispatch({ type: 'tick_date', date: new Date().toISOString().slice(0, 10) });
+    await tick();
+
     // -- widget toggle via settings --
     $('settings-open').click();
     check('settings panel opens', !$('settings-modal').hidden);

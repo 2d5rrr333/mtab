@@ -118,9 +118,14 @@ function renderClock() {
   }
   updateClockTime();
   const d = new Date();
+  // festival wins the slot, jieqi only on non-festival days (spec priority)
+  const special = clockView
+    ? (clockView.festival || clockView.solar_term || '')
+    : '';
   const parts = [
     `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`,
     clockView ? clockView.weekday : '',
+    special,
     clockView && clockView.lunar ? clockView.lunar : '',
   ].filter(Boolean);
   document.getElementById('clock-date').textContent = parts.join(' · ');

@@ -78,3 +78,13 @@ let digits : Array[String] = [
 
 ///|
 let day_prefixes : Array[String] = ["初", "十", "廿", "卅"]
+
+///|
+/// Jieqi names indexed by crossed multiple-of-15-degrees solar longitude
+/// (mod 24): slot 0 is the boundary the sun crosses heading from below
+/// 0° to 0° — i.e. the 春分 boundary — then every 15° in ecliptic order.
+let term_names : Array[String] = [
+  "春分", "清明", "谷雨", "立夏", "小满", "芒种", "夏至", "小暑",
+  "大暑", "立秋", "处暑", "白露", "秋分", "寒露", "霜降", "立冬",
+  "小雪", "大雪", "冬至", "小寒", "大寒", "立春", "雨水", "惊蛰",
+]

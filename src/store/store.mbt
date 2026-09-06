@@ -3,9 +3,13 @@
 ///|
 /// Clock display info derived from the current date (design D4): the JS
 /// side ticks seconds locally; weekday and lunar text come from here.
+/// solar_term / festival: the jieqi name when the day is a term-changeover
+/// day, and the festival name (festival wins the display slot).
 pub(all) struct ClockView {
   weekday : String
   lunar : String?
+  solar_term : String?
+  festival : String?
 } derive(Eq, Debug, ToJson)
 
 ///|
@@ -346,6 +350,7 @@ fn parse_digits(s : String) -> Int? {
 ///|
 /// Clock view for a date string: weekday always, lunar text when within the
 /// supported range (clock-widget spec: out of range shows no lunar info).
+/// Festival first, jieqi only when the day is no festival (spec priority).
 fn clock_view_for(date : String) -> ClockView? {
   match parse_ymd(date) {
     Some((y, m, d)) => {
@@ -353,7 +358,22 @@ fn clock_view_for(date : String) -> ClockView? {
         Some(ld) => Some(ld.to_display())
         None => None
       }
-      Some({ weekday: @lunar.weekday_name(y, m, d), lunar, })
+      // festival / jieqi derivation needs the full LunarDate
+      let festival = match @lunar.solar_to_lunar(y, m, d) {
+        Some(ld) => @lunar.festival_for(y, m, d, ld)
+        None => None
+      }
+      let solar_term = match festival {
+        // festival wins; skip the term computation (design D5)
+        Some(_) => None
+        None => @lunar.solar_term(y, m, d)
+      }
+      Some({
+        weekday: @lunar.weekday_name(y, m, d),
+        lunar,
+        solar_term,
+        festival,
+      })
     }
     None => None
   }

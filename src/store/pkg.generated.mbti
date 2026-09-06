@@ -22,6 +22,8 @@ pub fn update(Store, Event) -> Response
 pub(all) struct ClockView {
   weekday : String
   lunar : String?
+  solar_term : String?
+  festival : String?
 } derive(Eq, ToJson, @debug.Debug)
 
 pub(all) enum Effect {

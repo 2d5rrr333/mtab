@@ -114,6 +114,29 @@ const legacy = JSON.stringify({ version: 1, bookmarks: [], search: { engines: []
 r = JSON.parse(mtab.mtab_dispatch(`{"type":"config_import","json":${JSON.stringify(legacy)}}`));
 check('legacy config imports with empty history', r.state.config.search.history.length === 0, r.state.config.search);
 
+// -- solar terms & festivals (solar-terms-festivals change) --
+// fresh instance on a festival day: 2025-01-29 春节 (festival wins)
+const mod3 = new WebAssembly.Module(bytes, { builtins: ['js-string'] });
+const mtab3 = new WebAssembly.Instance(mod3, { _: imports._ }).exports;
+const r3 = JSON.parse(mtab3.mtab_init('', '2025-01-29'));
+check(
+  'init on 春节 carries festival, not term',
+  r3.state.clock.festival === '春节' && r3.state.clock.solar_term === undefined,
+  r3.state.clock,
+);
+// fresh instance on a term day: 2025-10-08 寒露
+const mod4 = new WebAssembly.Module(bytes, { builtins: ['js-string'] });
+const mtab4 = new WebAssembly.Instance(mod4, { _: imports._ }).exports;
+const r4 = JSON.parse(mtab4.mtab_init('', '2025-10-08'));
+check(
+  'init on 2025-10-08 carries 寒露',
+  r4.state.clock.solar_term === '寒露' && r4.state.clock.festival === undefined,
+  r4.state.clock,
+);
+// tick_date moves off the term day
+const r5 = JSON.parse(mtab4.mtab_dispatch('{"type":"tick_date","date":"2025-10-07"}'));
+check('tick_date off term day clears it', r5.state.clock.solar_term === undefined, r5.state.clock);
+
 // -- unknown event --
 r = JSON.parse(mtab.mtab_dispatch('{"type":"nope"}'));
 check('unknown event notifies', r.effects[0].type === 'notify_error', r.effects);
