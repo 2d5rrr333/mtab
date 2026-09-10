@@ -147,7 +147,7 @@ pub fn Config::default() -> Config {
       history: [],
     },
     widgets: { clock: true, bookmarks: true, countdown: false, },
-    wallpaper: Builtin("w1"),
+    wallpaper: Builtin("w3"),
     wallpaper_blur: 0,
     theme: "dark",
     countdowns: [],

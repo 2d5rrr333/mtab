@@ -376,7 +376,7 @@
         .every(l => cs(l).pointerEvents === 'none'));
     check('initial wallpaper layer visible',
       await until(() => activeWallpaper() &&
-        activeWallpaper().style.backgroundImage.includes('w1.svg') &&
+        activeWallpaper().style.backgroundImage.includes('w3.svg') &&
         activeWallpaper().classList.contains('visible')),
       activeWallpaper() && activeWallpaper().className);
 
