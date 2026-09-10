@@ -18,6 +18,14 @@
       <div class="time" id="clock-time">--:--:--</div>
       <div class="date-line" id="clock-date"></div>
     </header>
+    <section id="countdown" class="widget" hidden>
+      <div class="countdown-head">
+        <h3>倒数日</h3>
+        <button id="cd-add" type="button" class="ghost-btn" title="添加倒数日">添加</button>
+      </div>
+      <ul id="cd-list" class="cd-list"></ul>
+      <p class="cd-empty" id="cd-empty" hidden>还没有倒数日。点击「添加」记录生日、考试、纪念日。</p>
+    </section>
     <section id="search">
       <div class="engine-bar" id="engine-bar"></div>
       <div class="search-row">
@@ -54,6 +62,19 @@
     </form>
   </div>
 
+  <div class="modal-backdrop" id="cd-modal" hidden>
+    <form class="modal" id="cd-form">
+      <h3>添加倒数日</h3>
+      <label>名称<input name="name" type="text" placeholder="生日、考试、纪念日…" required></label>
+      <label>目标日期<input name="date" type="date" required></label>
+      <p class="form-error" id="cd-form-error" hidden></p>
+      <div class="modal-actions">
+        <button type="submit">保存</button>
+        <button type="button" id="cd-cancel">取消</button>
+      </div>
+    </form>
+  </div>
+
   <div class="modal-backdrop" id="settings-modal" hidden>
     <div class="modal settings">
       <h3>设置</h3>
@@ -69,6 +90,7 @@
         <h4>小组件</h4>
         <label><input type="checkbox" id="toggle-clock"> 时钟</label>
         <label><input type="checkbox" id="toggle-bookmarks"> 书签网格</label>
+        <label><input type="checkbox" id="toggle-countdown"> 倒数日</label>
       </section>
       <section>
         <h4>壁纸</h4>
@@ -857,6 +879,60 @@
       $('toast').textContent);
     check('invalid bookmark file keeps config',
       JSON.stringify(window.mtab.config) === stateAfterFirst);
+
+    // -- countdown widget (countdown-widget) --
+    check('countdown hidden by default', $('countdown').hidden);
+    // pin the date so day math is deterministic
+    window.mtab.dispatch({ type: 'tick_date', date: '2025-10-10' });
+    $('settings-open').click();
+    $('toggle-countdown').checked = true;
+    $('toggle-countdown').dispatchEvent(new Event('change', { cancelable: true }));
+    check('countdown toggle shows widget', !$('countdown').hidden);
+    check('empty countdown shows placeholder', !$('cd-empty').hidden);
+    $('settings-close').click();
+    // add through the real form (native date input)
+    $('cd-add').click();
+    $('cd-form').elements.name.value = '考试';
+    $('cd-form').elements.date.value = '2025-10-13';
+    $('cd-form').dispatchEvent(new Event('submit', { cancelable: true }));
+    await until(() => $('cd-list').children.length === 1);
+    check('countdown form add renders remaining days',
+      $('cd-list').querySelector('.cd-name').textContent === '考试' &&
+        $('cd-list').querySelector('.cd-days').textContent === '还有 3 天');
+    check('countdown entry persisted',
+      window.mtab.config.countdowns.length === 1 &&
+        window.mtab.config.countdowns[0].date === '2025-10-13');
+    // today and past semantics via direct events (form date min is today-agnostic)
+    window.mtab.dispatch({ type: 'countdown_add', name: '今天的事', date: '2025-10-10' });
+    window.mtab.dispatch({ type: 'countdown_add', name: '过去的', date: '2025-10-08' });
+    await until(() => $('cd-list').children.length === 3);
+    const dayTexts = [...$('cd-list').querySelectorAll('.cd-days')].map(e => e.textContent);
+    check('today and past semantics rendered',
+      dayTexts.includes('就是今天') && dayTexts.includes('已过 2 天'), dayTexts);
+    // invalid date through the store -> error toast, no entry
+    $('toast').hidden = true;
+    window.mtab.dispatch({ type: 'countdown_add', name: '坏日期', date: '2025-02-30' });
+    check('invalid countdown date rejected',
+      !$('toast').hidden && $('cd-list').children.length === 3);
+    // day rollover updates views without saving
+    window.mtab.dispatch({ type: 'tick_date', date: '2025-10-11' });
+    await until(() => [...$('cd-list').querySelectorAll('.cd-days')][0].textContent === '还有 2 天');
+    check('tick_date re-renders countdown rows',
+      [...$('cd-list').querySelectorAll('.cd-days')].every(e =>
+        e.textContent !== '还有 3 天'));
+    // delete via the rendered button
+    $('cd-list').querySelector('.cd-delete').click();
+    await until(() => $('cd-list').children.length === 2);
+    check('countdown delete removes the row',
+      window.mtab.config.countdowns.length === 2);
+    // toggle off hides the widget and persists
+    $('settings-open').click();
+    $('toggle-countdown').checked = false;
+    $('toggle-countdown').dispatchEvent(new Event('change', { cancelable: true }));
+    check('countdown toggle hides widget', $('countdown').hidden);
+    $('settings-close').click();
+    check('countdown data still persisted after hiding',
+      JSON.parse(localStorage.getItem('mtab.config')).countdowns.length === 2);
 
     // -- import through the real file input --
     // v1-shaped file (flat bookmarks) exercises the migration path

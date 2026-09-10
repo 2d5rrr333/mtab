@@ -35,11 +35,17 @@ pub fn normalize_url(String) -> String?
 
 pub fn number_field_opt(Map[String, Json], String) -> Int64?
 
+pub fn parse_countdown_date(String) -> (Int, Int, Int)?
+
 pub fn parse_netscape(String) -> ParseResult?
+
+pub fn remaining_days(String, String) -> Int?
 
 pub fn str_field(Map[String, Json], String, @json.JsonPath) -> String raise @json.JsonDecodeError
 
 pub fn str_field_opt(Map[String, Json], String) -> String?
+
+pub fn validate_countdown_date(String) -> Bool
 
 // Errors
 
@@ -60,12 +66,21 @@ pub(all) struct Config {
   wallpaper : Wallpaper
   wallpaper_blur : Int
   theme : String
+  countdowns : Array[Countdown]
 } derive(Eq, @debug.Debug)
 pub fn Config::decode(String) -> Self raise
 pub fn Config::default() -> Self
 pub fn Config::encode(Self) -> String
 pub impl ToJson for Config
 pub impl @json.FromJson for Config
+
+pub(all) struct Countdown {
+  id : String
+  name : String
+  date : String
+} derive(Eq, @debug.Debug)
+pub impl ToJson for Countdown
+pub impl @json.FromJson for Countdown
 
 pub(all) struct Engine {
   id : String
@@ -126,6 +141,7 @@ pub impl @json.FromJson for Wallpaper
 pub(all) struct WidgetsConfig {
   clock : Bool
   bookmarks : Bool
+  countdown : Bool
 } derive(Eq, @debug.Debug)
 pub impl ToJson for WidgetsConfig
 pub impl @json.FromJson for WidgetsConfig

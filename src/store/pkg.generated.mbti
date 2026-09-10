@@ -30,6 +30,12 @@ pub(all) struct ClockView {
   festival : String?
 } derive(Eq, ToJson, @debug.Debug)
 
+pub(all) struct CountdownView {
+  id : String
+  name : String
+  days : Int
+} derive(Eq, ToJson, @debug.Debug)
+
 pub(all) enum Effect {
   Save
   OpenUrl(url~ : String)
@@ -44,6 +50,8 @@ pub(all) enum Event {
   BookmarkDelete(id~ : String)
   BookmarkMove(id~ : String, to_group~ : String, to_index~ : Int)
   BookmarkImport(html~ : String)
+  CountdownAdd(name~ : String, date~ : String)
+  CountdownDelete(id~ : String)
   GroupAdd(name~ : String)
   GroupRename(id~ : String, name~ : String)
   GroupDelete(id~ : String)
@@ -79,6 +87,8 @@ pub(all) struct Store {
   config : @model.Config
   clock : ClockView?
   suggestions : Array[@model.HistoryEntry]
+  today : String
+  countdown_views : Array[CountdownView]
 } derive(Eq, ToJson, @debug.Debug)
 
 // Type aliases

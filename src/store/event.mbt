@@ -8,6 +8,8 @@ pub(all) enum Event {
   BookmarkDelete(id~ : String)
   BookmarkMove(id~ : String, to_group~ : String, to_index~ : Int)
   BookmarkImport(html~ : String)
+  CountdownAdd(name~ : String, date~ : String)
+  CountdownDelete(id~ : String)
   GroupAdd(name~ : String)
   GroupRename(id~ : String, name~ : String)
   GroupDelete(id~ : String)
@@ -70,6 +72,12 @@ pub impl FromJson for Event with fn from_json(
       )
     "bookmark_import" =>
       BookmarkImport(html=@model.str_field(map, "html", path))
+    "countdown_add" =>
+      CountdownAdd(
+        name=@model.str_field(map, "name", path),
+        date=@model.str_field(map, "date", path),
+      )
+    "countdown_delete" => CountdownDelete(id=@model.str_field(map, "id", path))
     "group_add" => GroupAdd(name=@model.str_field(map, "name", path))
     "group_rename" =>
       GroupRename(

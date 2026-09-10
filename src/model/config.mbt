@@ -17,6 +17,7 @@ pub(all) struct Config {
   wallpaper : Wallpaper
   wallpaper_blur : Int
   theme : String
+  countdowns : Array[Countdown]
 } derive(Eq, Debug)
 
 ///|
@@ -33,6 +34,7 @@ pub impl ToJson for Config with fn to_json(self) {
     "wallpaper": self.wallpaper,
     "wallpaperBlur": self.wallpaper_blur,
     "theme": self.theme,
+    "countdowns": self.countdowns,
   }
 }
 
@@ -78,6 +80,8 @@ pub impl FromJson for Config with fn from_json(
     wallpaper_blur: int_field_opt(map, "wallpaperBlur"),
     // old files carry no theme: default dark (theme-system D2)
     theme: theme_field(map),
+    // old files carry no countdowns: default empty list (countdown-widget D1)
+    countdowns: countdowns_field(map, path),
   }
 }
 
@@ -88,6 +92,28 @@ fn theme_field(map : Map[String, Json]) -> String {
     Some(String("light")) => "light"
     Some(String("auto")) => "auto"
     _ => "dark"
+  }
+}
+
+///|
+/// Countdowns field: absent or non-array -> empty list (countdown-widget
+/// design D1 backward compatibility). Undecodable entries are skipped so
+/// one bad row never breaks the whole config.
+fn countdowns_field(
+  map : Map[String, Json],
+  path : @json.JsonPath,
+) -> Array[Countdown] {
+  match map.get("countdowns") {
+    Some(Array(items)) => {
+      let out : Array[Countdown] = []
+      for i, item in items {
+        out.push(@json.from_json(item, path=path.add_index(i))) catch {
+          _ => ()
+        }
+      }
+      out
+    }
+    _ => []
   }
 }
 
@@ -119,10 +145,11 @@ pub fn Config::default() -> Config {
       current: "baidu",
       history: [],
     },
-    widgets: { clock: true, bookmarks: true, },
+    widgets: { clock: true, bookmarks: true, countdown: false, },
     wallpaper: Builtin("w1"),
     wallpaper_blur: 0,
     theme: "dark",
+    countdowns: [],
   }
 }
 

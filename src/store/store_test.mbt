@@ -202,7 +202,10 @@ test "wallpaper_set_builtin and wallpaper_set_custom update and save" {
 test "config_import replaces the whole config and saves (task 2.4)" {
   let base = @store.open(None, "2025-01-29").state
   let other = @model.Config::default()
-  let other = { ..other, widgets: { clock: false, bookmarks: false, }, }
+  let other = {
+    ..other,
+    widgets: { clock: false, bookmarks: false, countdown: false, },
+  }
   let resp = @store.update(base, ConfigImport(json=other.encode()))
   assert_eq(resp.state.config, other)
   assert_eq(resp.effects, [Save])

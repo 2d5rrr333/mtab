@@ -14,6 +14,7 @@
 | 时钟小组件 | 公历日期时间 + 农历 + 干支/星期（1900–2100，纯 MoonBit 换算）+ 24 节气天文历算 + 节日徽章 |
 | 书签网格 | 增删改、favicon 图标 + 首字回退、新标签打开；分组管理与指针拖拽排序、分组折叠记忆 |
 | 书签导入 | 浏览器导出的 Netscape 书签 HTML（Chrome/Edge/Firefox）一键导入：容错解析、实体还原、同名分组合并、URL 去重 |
+| 倒数日小组件 | 自定义目标日（生日/考试/纪念日），显示剩余天数（还有 N 天 / 就是今天 / 已过 N 天）；跨年闰年按真实日历计算，跨日自动刷新 |
 | 多引擎搜索 | 百度 / Bing / Google 一键切换，回车当前页跳转；历史联想（trie + 半衰期评分）+ 拼音联想（全拼/首字母） |
 | 壁纸 | 4 张内置 SVG + 本地上传（长边 1920px 压缩、JPEG 80%）；双层层叠 crossfade 淡入（先解码后淡入，避免大图硬弹） |
 | 个性化 | 小组件显隐开关；深/浅/自动主题令牌；壁纸模糊度；全部配置 localStorage 持久化；离线可用 |
@@ -63,9 +64,9 @@ npx serve web               # 或 python -m http.server 8000 -d web
 
 | 层 | 命令 | 覆盖 |
 |---|---|---|
-| 单元测试 | `moon test` | store 事件归约、Netscape 书签解析、模型 JSON 往返、URL 归一化、农历换算（含闰月、春节边界）—— 140 项 |
-| e2e | `node e2e.mjs` | 真实 wasm 实例过 FFI 桥逐事件断言 —— 51 项 |
-| headless | `node headless.cjs` | Edge headless 双运行（正常 + `--force-prefers-reduced-motion`）：渲染检查、交互/样式断言、书签导入流程等 —— 114 + 116 项（需 Windows + Edge） |
+| 单元测试 | `moon test` | store 事件归约、Netscape 书签解析、倒数日日期运算、模型 JSON 往返、URL 归一化、农历换算（含闰月、春节边界）—— 156 项 |
+| e2e | `node e2e.mjs` | 真实 wasm 实例过 FFI 桥逐事件断言 —— 67 项 |
+| headless | `node headless.cjs` | Edge headless 双运行（正常 + `--force-prefers-reduced-motion`）：渲染检查、交互/样式断言、书签导入与倒数日流程 —— 125 + 127 项（需 Windows + Edge） |
 
 GitHub Actions（`.github/workflows/ci.yml`）在每次 push / PR 上执行
 `moon check` → `moon fmt --check` → `moon test` → `build.ps1 -Release` → `node e2e.mjs`，并上传可部署的 `web/` 产物。
@@ -77,8 +78,8 @@ GitHub Actions（`.github/workflows/ci.yml`）在每次 push / PR 上执行
 ├── build.ps1             # wasm 编译 + 产物暂存（跨平台）
 ├── src/
 │   ├── main/             # wasm 导出：mtab_init / mtab_dispatch
-│   ├── store/            # 状态树、事件归约、副作用队列、导入归并
-│   ├── model/            # 配置/书签/引擎/壁纸模型、JSON 编解码、Netscape 解析
+│   ├── store/            # 状态树、事件归约、副作用队列、导入归并、倒数日视图
+│   ├── model/            # 配置/书签/引擎/壁纸/倒数日模型、JSON 编解码、Netscape 解析
 │   ├── pinyin/           # 无声调拼音表（~2000 常用字）
 │   ├── trie/             # 字符前缀 trie（历史联想检索）
 │   └── lunar/            # 公历↔农历换算、节气天文历算（1900–2100）
@@ -90,8 +91,8 @@ GitHub Actions（`.github/workflows/ci.yml`）在每次 push / PR 上执行
 
 ## 工程过程：规格驱动
 
-本仓库采用 OpenSpec 规格驱动流程开发：`openspec/specs/` 下 4 个 capability
-（`clock-widget` / `bookmark-grid` / `search-box` / `configuration`）的行为规格先行，
+本仓库采用 OpenSpec 规格驱动流程开发：`openspec/specs/` 下 5 个 capability
+（`clock-widget` / `bookmark-grid` / `search-box` / `configuration` / `countdown-widget`）的行为规格先行，
 每个变更（proposal → design → tasks → 验收记录）归档于 `openspec/changes/archive/`，
 开发动机、技术决策与验证结果完整可追溯。
 

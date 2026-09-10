@@ -1,5 +1,6 @@
 // Package model: configuration data model + JSON codec (design D6).
 
 import {
+  "2d5rrr333/mtab/lunar",
   "moonbitlang/core/json",
 }

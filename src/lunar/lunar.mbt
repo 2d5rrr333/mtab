@@ -66,8 +66,9 @@ fn month_days(year : Int, month : Int) -> Int {
 }
 
 ///|
-/// Days in Gregorian month `m` (1..12) of year `y`.
-fn solar_days(y : Int, m : Int) -> Int {
+/// Days in Gregorian month `m` (1..12) of year `y`. Public: countdown date
+/// validation reuses it (countdown-widget design D2).
+pub fn solar_days(y : Int, m : Int) -> Int {
   if m == 2 {
     if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 {
       29
@@ -92,6 +93,14 @@ fn days_from_civil(y : Int, m : Int, d : Int) -> Int {
   let doy = (153 * mp + 2) / 5 + d - 1
   let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
   era * 146097 + doe - 719468
+}
+
+///|
+/// Public wrapper over days_from_civil (countdown-widget D2): day number
+/// of a Gregorian date, so date differences work across years and leap
+/// years without duplicating the algorithm.
+pub fn gregorian_day_number(y : Int, m : Int, d : Int) -> Int {
+  days_from_civil(y, m, d)
 }
 
 ///|

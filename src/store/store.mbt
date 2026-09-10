@@ -13,13 +13,26 @@ pub(all) struct ClockView {
 } derive(Eq, Debug, ToJson)
 
 ///|
-/// Full state exposed over the bridge: the config, the derived clock, and
-/// the transient search suggestions (never persisted; recomputed on
-/// history-relevant events, carried along otherwise).
+/// One rendered countdown row (countdown-widget design D3): derived view,
+/// never persisted. `days`: positive = N days remain, 0 = is today,
+/// negative = N days past.
+pub(all) struct CountdownView {
+  id : String
+  name : String
+  days : Int
+} derive(Eq, Debug, ToJson)
+
+///|
+/// Full state exposed over the bridge: the config, the derived clock, the
+/// transient search suggestions (never persisted; recomputed on
+/// history-relevant events, carried along otherwise), the current date
+/// string, and the derived countdown rows.
 pub(all) struct Store {
   config : @model.Config
   clock : ClockView?
   suggestions : Array[@model.HistoryEntry]
+  today : String
+  countdown_views : Array[CountdownView]
 } derive(Eq, Debug, ToJson)
 
 ///|
@@ -46,9 +59,28 @@ pub fn open(stored : String?, today : String) -> Response {
       config,
       clock: clock_view_for(today),
       suggestions: recent_suggestions(config.search.history),
+      today,
+      countdown_views: countdown_views_for(config.countdowns, today),
     },
     [],
   )
+}
+
+///|
+/// Derived countdown rows for the bridge: config order kept; entries with
+/// undecodable dates are skipped (they cannot be added through the store).
+fn countdown_views_for(
+  countdowns : Array[@model.Countdown],
+  today : String,
+) -> Array[CountdownView] {
+  let out : Array[CountdownView] = []
+  for c in countdowns {
+    match @model.remaining_days(c.date, today) {
+      Some(days) => out.push({ id: c.id, name: c.name, days, })
+      None => ()
+    }
+  }
+  out
 }
 
 ///|
@@ -170,6 +202,50 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
           }
         }
       }
+    CountdownAdd(name~, date~) => {
+      let trimmed = name.trim().to_owned()
+      if trimmed == "" {
+        (
+          store,
+          [NotifyError(message="名称无效，请填写倒数日名称")],
+        )
+      } else if !@model.validate_countdown_date(date) {
+        (
+          store,
+          [NotifyError(message="日期无效，请填写真实存在的日期")],
+        )
+      } else {
+        let countdowns = store.config.countdowns.copy()
+        countdowns.push({
+          id: next_countdown_id(store.config.countdowns),
+          name: trimmed,
+          date,
+        })
+        (
+          {
+            ..store,
+            config: { ..store.config, countdowns, },
+            countdown_views: countdown_views_for(countdowns, store.today),
+          },
+          [Save],
+        )
+      }
+    }
+    CountdownDelete(id~) => {
+      let countdowns = store.config.countdowns.filter(c => c.id != id)
+      if countdowns.length() != store.config.countdowns.length() {
+        (
+          {
+            ..store,
+            config: { ..store.config, countdowns, },
+            countdown_views: countdown_views_for(countdowns, store.today),
+          },
+          [Save],
+        )
+      } else {
+        (store, [NotifyError(message="要删除的倒数日不存在")])
+      }
+    }
     GroupAdd(name~) => {
       let trimmed = name.trim().to_owned()
       if trimmed == "" {
@@ -376,6 +452,17 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
             },
             [Save],
           )
+        "countdown" =>
+          (
+            {
+              ..store,
+              config: {
+                ..store.config,
+                widgets: { ..widgets, countdown: !widgets.countdown, },
+              },
+            },
+            [Save],
+          )
         _ => (store, [])
       }
     }
@@ -405,6 +492,8 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
               config: cfg,
               clock: store.clock,
               suggestions: recent_suggestions(cfg.search.history),
+              today: store.today,
+              countdown_views: countdown_views_for(cfg.countdowns, store.today),
             },
             [Save],
           )
@@ -417,8 +506,30 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
       } catch {
         _ => (store, [NotifyError(message="导入失败：文件格式无效")])
       }
-    TickDate(date~) => ({ ..store, clock: clock_view_for(date), }, [])
+    TickDate(date~) =>
+      (
+        {
+          ..store,
+          clock: clock_view_for(date),
+          today: date,
+          countdown_views: countdown_views_for(store.config.countdowns, date),
+        },
+        [],
+      )
   }
+}
+
+///|
+/// Generate a fresh countdown id ("c" + next number above all existing ones).
+fn next_countdown_id(countdowns : Array[@model.Countdown]) -> String {
+  let mut max = 0
+  for c in countdowns {
+    let n = numeric_suffix(c.id)
+    if n > max {
+      max = n
+    }
+  }
+  "c" + (max + 1).to_string()
 }
 
 ///|

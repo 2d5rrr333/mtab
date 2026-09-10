@@ -71,6 +71,7 @@ const wasm = await loadWasm();
 let config = null; // current state.config
 let clockView = null; // current state.clock
 let suggestions = []; // current state.suggestions (transient view)
+let countdownViews = []; // current state.countdown_views (derived, D3)
 let editingBookmarkId = null; // bookmark form mode
 
 function todayStr() {
@@ -82,6 +83,7 @@ function todayStr() {
 function apply(response) {
   config = response.state.config;
   clockView = response.state.clock;
+  countdownViews = response.state.countdown_views || [];
   const prevSuggestions = suggestions;
   suggestions = response.state.suggestions || [];
   runEffects(response.effects);
@@ -150,6 +152,7 @@ function toast(message, type = 'error') {
 function renderAll() {
   renderClock();
   renderEngineBar();
+  renderCountdown();
   renderBookmarks();
   applyWallpaper();
   applyWallpaperBlur();
@@ -340,6 +343,51 @@ function moveHighlight(delta) {
     el.classList.toggle('active', Number(el.dataset.index) === suggestIndex);
     el.setAttribute('aria-selected', String(Number(el.dataset.index) === suggestIndex));
   }
+}
+
+// countdown widget (countdown-widget design D5): derived rows only,
+// days semantics decided in wasm (positive remain / 0 today / negative past)
+function countdownLabel(days) {
+  if (days > 0) {
+    return `还有 ${days} 天`;
+  }
+  if (days === 0) {
+    return '就是今天';
+  }
+  return `已过 ${-days} 天`;
+}
+
+function renderCountdown() {
+  const section = document.getElementById('countdown');
+  section.hidden = !config.widgets.countdown;
+  if (!config.widgets.countdown) {
+    return;
+  }
+  const list = document.getElementById('cd-list');
+  list.replaceChildren();
+  for (const cd of countdownViews) {
+    const li = document.createElement('li');
+    li.className = 'cd-item';
+    li.dataset.cdId = cd.id;
+    const name = document.createElement('span');
+    name.className = 'cd-name';
+    name.textContent = cd.name;
+    const badge = document.createElement('span');
+    badge.className = 'cd-days' + (cd.days === 0 ? ' today' : cd.days < 0 ? ' past' : '');
+    badge.textContent = countdownLabel(cd.days);
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'cd-delete';
+    del.setAttribute('aria-label', `删除倒数日 ${cd.name}`);
+    del.title = '删除';
+    del.textContent = '×';
+    del.addEventListener('click', () => {
+      dispatch({ type: 'countdown_delete', id: cd.id });
+    });
+    li.append(name, badge, del);
+    list.appendChild(li);
+  }
+  document.getElementById('cd-empty').hidden = countdownViews.length > 0;
 }
 
 // bookmarks: group sections rebuilt on data change, interactions via
@@ -710,6 +758,7 @@ function revealWallpaper(image, request) {
 function syncSettingsControls() {
   document.getElementById('toggle-clock').checked = config.widgets.clock;
   document.getElementById('toggle-bookmarks').checked = config.widgets.bookmarks;
+  document.getElementById('toggle-countdown').checked = config.widgets.countdown;
   document.getElementById('wallpaper-blur').value = String(config.wallpaperBlur || 0);
   document.getElementById('wallpaper-blur-value').textContent =
     String(config.wallpaperBlur || 0);
@@ -832,6 +881,21 @@ function importBookmarks(file) {
   const reader = new FileReader();
   reader.onload = () => dispatch({ type: 'bookmark_import', html: String(reader.result) });
   reader.readAsText(file);
+}
+
+// ---- countdown add form (countdown-widget design D5) ----
+
+function openCountdownForm() {
+  const form = document.getElementById('cd-form');
+  form.elements.name.value = '';
+  form.elements.date.value = '';
+  document.getElementById('cd-form-error').hidden = true;
+  document.getElementById('cd-modal').hidden = false;
+  form.elements.name.focus();
+}
+
+function closeCountdownForm() {
+  document.getElementById('cd-modal').hidden = true;
 }
 
 // ---- wiring ----
@@ -981,6 +1045,32 @@ function wireEvents() {
   });
   document.getElementById('bm-cancel').addEventListener('click', closeBookmarkForm);
 
+  // countdown form
+  document.getElementById('cd-add').addEventListener('click', openCountdownForm);
+  document.getElementById('cd-cancel').addEventListener('click', closeCountdownForm);
+  document.getElementById('cd-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const form = e.target;
+    const name = form.elements.name.value;
+    const date = form.elements.date.value; // native date input: YYYY-MM-DD
+    if (!date) {
+      const err = document.getElementById('cd-form-error');
+      err.textContent = '请选择目标日期';
+      err.hidden = false;
+      return;
+    }
+    const before = config.countdowns.length;
+    dispatch({ type: 'countdown_add', name, date });
+    // success appends (wasm validates name/date; failures notify via toast)
+    if (config.countdowns.length > before) {
+      closeCountdownForm();
+    } else {
+      const err = document.getElementById('cd-form-error');
+      err.textContent = '名称或日期无效，请检查后重试';
+      err.hidden = false;
+    }
+  });
+
   // settings: widget toggles
   document.getElementById('toggle-clock').addEventListener('change', e => {
     // the toggle's own checkbox already flipped; sync back to state on render
@@ -990,6 +1080,10 @@ function wireEvents() {
   document.getElementById('toggle-bookmarks').addEventListener('change', e => {
     dispatch({ type: 'widget_toggle', widget: 'bookmarks' });
     e.target.checked = config.widgets.bookmarks;
+  });
+  document.getElementById('toggle-countdown').addEventListener('change', e => {
+    dispatch({ type: 'widget_toggle', widget: 'countdown' });
+    e.target.checked = config.widgets.countdown;
   });
 
   // settings: theme picker (theme-system D3)

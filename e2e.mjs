@@ -253,6 +253,59 @@ check('invalid bookmark file notifies and keeps state',
     JSON.stringify(ri.state.config) === beforeBad,
   ri.effects);
 
+// -- countdown widget (countdown-widget change) --
+const modC = new WebAssembly.Module(bytes, { builtins: ['js-string'] });
+const mtabC = new WebAssembly.Instance(modC, { _: imports._ }).exports;
+let rc = JSON.parse(mtabC.mtab_init('', '2026-09-10'));
+check('countdown widget off by default', rc.state.config.widgets.countdown === false);
+check('open seeds today', rc.state.today === '2026-09-10');
+rc = JSON.parse(mtabC.mtab_dispatch('{"type":"countdown_add","name":"生日","date":"2026-12-01"}'));
+check('countdown_add appends and derives days',
+  rc.state.config.countdowns.length === 1 &&
+    rc.state.countdown_views[0].days === 82,
+  rc.state.countdown_views);
+check('countdown_add saves', rc.effects[0].type === 'save');
+rc = JSON.parse(mtabC.mtab_dispatch('{"type":"countdown_add","name":"  ","date":"2026-12-01"}'));
+check('blank countdown name rejected',
+  rc.effects[0].type === 'notify_error' && rc.state.config.countdowns.length === 1);
+rc = JSON.parse(mtabC.mtab_dispatch('{"type":"countdown_add","name":"坏","date":"2026-02-30"}'));
+check('impossible countdown date rejected',
+  rc.effects[0].type === 'notify_error' && rc.state.config.countdowns.length === 1);
+// today / past semantics + rollover
+rc = JSON.parse(mtabC.mtab_dispatch('{"type":"countdown_add","name":"今天","date":"2026-09-10"}'));
+rc = JSON.parse(mtabC.mtab_dispatch('{"type":"countdown_add","name":"过去","date":"2026-09-08"}'));
+rc = JSON.parse(mtabC.mtab_dispatch('{"type":"tick_date","date":"2026-09-11"}'));
+check('tick_date updates views without saving',
+  rc.effects.length === 0 &&
+    rc.state.countdown_views.map(v => v.days).join(',') === '81,-1,-3',
+  rc.state.countdown_views);
+// delete
+rc = JSON.parse(mtabC.mtab_dispatch('{"type":"countdown_delete","id":"c1"}'));
+check('countdown_delete removes the entry',
+  rc.state.config.countdowns.length === 2 && rc.effects[0].type === 'save');
+rc = JSON.parse(mtabC.mtab_dispatch('{"type":"countdown_delete","id":"zz"}'));
+check('missing countdown delete notifies', rc.effects[0].type === 'notify_error');
+// widget toggle round-trip
+rc = JSON.parse(mtabC.mtab_dispatch('{"type":"widget_toggle","widget":"countdown"}'));
+check('countdown widget toggles on',
+  rc.state.config.widgets.countdown === true);
+// config round-trip carries countdowns; legacy file decodes without them
+const withCountdowns = JSON.stringify(rc.state.config);
+const modC2 = new WebAssembly.Module(bytes, { builtins: ['js-string'] });
+const mtabC2 = new WebAssembly.Instance(modC2, { _: imports._ }).exports;
+let rc2 = JSON.parse(mtabC2.mtab_init(withCountdowns, '2026-09-15'));
+check('config round-trip keeps countdowns and derives fresh days',
+  rc2.state.config.countdowns.length === 2 &&
+    rc2.state.countdown_views[0].days === -5,
+  rc2.state.countdown_views);
+const legacyNoCd = JSON.stringify({
+  version: 2, groups: [], search: { engines: [], current: 'baidu', history: [] },
+  widgets: { clock: true, bookmarks: true }, wallpaper: { type: 'builtin', id: 'w1' },
+});
+rc2 = JSON.parse(mtabC2.mtab_dispatch(`{"type":"config_import","json":${JSON.stringify(legacyNoCd)}}`));
+check('legacy config imports with empty countdowns',
+  rc2.state.config.countdowns.length === 0 && rc2.effects[0].type === 'save');
+
 // -- unknown event --
 r = JSON.parse(mtab.mtab_dispatch('{"type":"nope"}'));
 check('unknown event notifies', r.effects[0].type === 'notify_error', r.effects);

@@ -22,6 +22,16 @@
       <div class="date-line" id="clock-date"></div>
     </header>
 
+    <!-- countdown widget (countdown-widget design D5) -->
+    <section id="countdown" class="widget" hidden>
+      <div class="countdown-head">
+        <h3>倒数日</h3>
+        <button id="cd-add" type="button" class="ghost-btn" title="添加倒数日">添加</button>
+      </div>
+      <ul id="cd-list" class="cd-list"></ul>
+      <p class="cd-empty" id="cd-empty" hidden>还没有倒数日。点击「添加」记录生日、考试、纪念日。</p>
+    </section>
+
     <!-- search box: always-on base component -->
     <section id="search">
       <div class="engine-bar" id="engine-bar"></div>
@@ -66,6 +76,20 @@
     </form>
   </div>
 
+  <!-- countdown add form (modal) -->
+  <div class="modal-backdrop" id="cd-modal" hidden>
+    <form class="modal" id="cd-form">
+      <h3>添加倒数日</h3>
+      <label>名称<input name="name" type="text" placeholder="生日、考试、纪念日…" required></label>
+      <label>目标日期<input name="date" type="date" required></label>
+      <p class="form-error" id="cd-form-error" hidden></p>
+      <div class="modal-actions">
+        <button type="submit">保存</button>
+        <button type="button" id="cd-cancel">取消</button>
+      </div>
+    </form>
+  </div>
+
   <!-- settings panel -->
   <div class="modal-backdrop" id="settings-modal" hidden>
     <div class="modal settings">
@@ -84,6 +108,7 @@
         <h4>小组件</h4>
         <label><input type="checkbox" id="toggle-clock"> 时钟</label>
         <label><input type="checkbox" id="toggle-bookmarks"> 书签网格</label>
+        <label><input type="checkbox" id="toggle-countdown"> 倒数日</label>
       </section>
 
       <section>

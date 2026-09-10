@@ -8,6 +8,10 @@ import {
 // Values
 pub fn festival_for(Int, Int, Int, LunarDate) -> String?
 
+pub fn gregorian_day_number(Int, Int, Int) -> Int
+
+pub fn solar_days(Int, Int) -> Int
+
 pub fn solar_term(Int, Int, Int) -> String?
 
 pub fn solar_to_lunar(Int, Int, Int) -> LunarDate?
