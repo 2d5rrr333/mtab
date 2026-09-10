@@ -1,6 +1,18 @@
 // Config model round-trip and validation tests (tasks 2.1).
 
 ///|
+test "default config ships starter bookmarks in the default group" {
+  let cfg = Config::default()
+  assert_eq(cfg.groups.length(), 1)
+  assert_eq(cfg.groups[0].id, DEFAULT_GROUP_ID)
+  assert_eq(cfg.groups[0].bookmarks.length(), 6)
+  assert_eq(cfg.groups[0].bookmarks.map(b => b.id), [
+    "b1", "b2", "b3", "b4", "b5", "b6",
+  ])
+  assert_eq(cfg.groups[0].bookmarks[0].url, "https://www.baidu.com")
+}
+
+///|
 test "default config round-trips through JSON" {
   let cfg = Config::default()
   let encoded = cfg.encode()

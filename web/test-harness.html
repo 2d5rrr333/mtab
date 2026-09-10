@@ -15,7 +15,7 @@
   <!-- same skeleton as index.html; app.js renders into these nodes -->
   <main id="app">
     <header id="clock" class="widget">
-      <div class="time" id="clock-time">--:--:--</div>
+      <div class="time" id="clock-time">--:--</div>
       <div class="date-line" id="clock-date"></div>
     </header>
     <section id="countdown" class="widget" hidden>
@@ -241,6 +241,17 @@
 
     await new Promise(r => setTimeout(r, 50)); // let the app settle
 
+    // -- starter presets ship by default (starter-presets-and-clock) --
+    check('default config ships starter bookmarks',
+      window.mtab.config.groups[0].bookmarks.length >= 6,
+      window.mtab.config.groups[0].bookmarks.map(b => b.name));
+    // reset to an empty baseline so the rest of the flow keeps its
+    // empty-start assumptions (bookmark counts, empty state, ...)
+    const baselineCfg = JSON.parse(JSON.stringify(window.mtab.config));
+    baselineCfg.groups = [];
+    baselineCfg.countdowns = [];
+    window.mtab.dispatch({ type: 'config_import', json: JSON.stringify(baselineCfg) });
+
     // -- initial render --
     check('clock visible by default', !$('clock').hidden);
     check('clock date includes 星期', $('clock-date').textContent.includes('星期'));
@@ -253,10 +264,13 @@
       cs($('clock-time')).fontVariantNumeric.includes('tabular-nums') &&
       cs($('clock-time')).fontWeight === '300',
       cs($('clock-time')).fontVariantNumeric);
+    check('clock shows hour:minute only',
+      /^\d{2}:\d{2}$/.test($('clock-time').textContent.trim()),
+      $('clock-time').textContent);
     const cw1 = $('clock-time').offsetWidth;
-    await new Promise(r => setTimeout(r, 1050)); // one virtual second passes
+    await new Promise(r => setTimeout(r, 1050)); // time advances
     const cw2 = $('clock-time').offsetWidth;
-    check('clock width stable across a second tick', cw1 === cw2 && cw1 > 0,
+    check('clock width stable over time', cw1 === cw2 && cw1 > 0,
       { cw1, cw2 });
     // 1.2 focus state
     // NOTE: computed styles of TRANSITIONED properties freeze at their start

@@ -1,6 +1,15 @@
 // Store tests (tasks 2.3, 2.4, 3.2): one assertion set per event kind.
 
 ///|
+/// A store whose default group is explicitly empty. The shipped default
+/// config now carries starter bookmarks (starter-presets-and-clock), so
+/// tests that assume a blank grid start from here.
+fn empty_store(today : String) -> @store.Store {
+  let cfg = { ..@model.Config::default(), groups: [], }
+  @store.open(Some(cfg.encode()), today).state
+}
+
+///|
 test "open with no stored config yields the default config" {
   let resp = @store.open(None, "2025-01-29")
   assert_eq(resp.state.config, @model.Config::default())
@@ -53,8 +62,20 @@ test "tick_date outside lunar range still shows the weekday" {
 }
 
 ///|
-test "bookmark_add normalizes the url and requests a save" {
+test "new bookmark ids continue after the starter presets" {
   let base = @store.open(None, "2025-01-29").state
+  assert_eq(base.config.groups[0].bookmarks.length(), 6)
+  let resp = @store.update(
+    base,
+    BookmarkAdd(name="新的", url="new.example.com", group=None),
+  )
+  let added = resp.state.config.groups[0].bookmarks
+  assert_eq(added[added.length() - 1].id, "b7")
+}
+
+///|
+test "bookmark_add normalizes the url and requests a save" {
+  let base = empty_store("2025-01-29")
   let resp = @store.update(
     base,
     BookmarkAdd(name="示例", url="example.com", group=None),
@@ -78,7 +99,7 @@ test "bookmark_add rejects an invalid url with a notification" {
 
 ///|
 test "bookmark_edit updates name and url in place" {
-  let base = @store.open(None, "2025-01-29").state
+  let base = empty_store("2025-01-29")
   let added = @store.update(
       base,
       BookmarkAdd(name="示例", url="example.com", group=None),
@@ -100,7 +121,7 @@ test "bookmark_edit updates name and url in place" {
 
 ///|
 test "consecutive adds get distinct ids (browser harness regression)" {
-  let base = @store.open(None, "2025-01-29").state
+  let base = empty_store("2025-01-29")
   let one = @store.update(
       base,
       BookmarkAdd(name="一", url="a.example.com", group=None),
@@ -118,7 +139,7 @@ test "consecutive adds get distinct ids (browser harness regression)" {
 
 ///|
 test "bookmark_delete removes the bookmark" {
-  let base = @store.open(None, "2025-01-29").state
+  let base = empty_store("2025-01-29")
   let added = @store.update(
       base,
       BookmarkAdd(name="示例", url="example.com", group=None),

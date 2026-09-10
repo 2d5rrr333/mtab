@@ -124,7 +124,7 @@ function report(name, ok) {
   const dom = await runEdge(['--dump-dom', base]);
   failed += report('favicon linked in head', /<link rel="icon"[^>]*href="favicon\.svg"/.test(dom));
   failed += report('theme-color meta present', /<meta name="theme-color" content="#1c1e26"/.test(dom));
-  failed += report('clock rendered with time', /id="clock-time"[^>]*>\d{2}:\d{2}:\d{2}/.test(dom));
+  failed += report('clock rendered with time', /id="clock-time"[^>]*>\d{2}:\d{2}/.test(dom));
   failed += report('date line has 星期', /星期[一二三四五六日]/.test(dom));
   failed += report('lunar text rendered', /[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]年(闰)?[正二三四五六七八九十冬腊]月/.test(dom));
   failed += report('engine bar has 3 engines', (dom.match(/class="engine-bar"[\s\S]*?<\/div>/) || [''])[0].split('<button').length - 1 >= 3);

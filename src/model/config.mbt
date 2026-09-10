@@ -118,12 +118,13 @@ fn countdowns_field(
 }
 
 ///|
-/// The default configuration: preset engines (baidu/google/bing), empty
-/// bookmark grid, all widgets on, first built-in wallpaper.
+/// The default configuration: preset engines (baidu/google/bing), a default
+/// group carrying the starter bookmarks, all primary widgets on, first
+/// built-in wallpaper.
 pub fn Config::default() -> Config {
   {
     version: CONFIG_VERSION,
-    groups: [make_default_group([])],
+    groups: [make_default_group(starter_bookmarks())],
     search: {
       engines: [
         {
@@ -151,6 +152,21 @@ pub fn Config::default() -> Config {
     theme: "dark",
     countdowns: [],
   }
+}
+
+///|
+/// Starter bookmarks shipped in the default group on first run
+/// (starter-presets-and-clock D1). Users can edit/delete them like any
+/// other bookmark; once a config is stored they are never re-injected.
+pub fn starter_bookmarks() -> Array[Bookmark] {
+  [
+    { id: "b1", name: "百度", url: "https://www.baidu.com", },
+    { id: "b2", name: "哔哩哔哩", url: "https://www.bilibili.com", },
+    { id: "b3", name: "知乎", url: "https://www.zhihu.com", },
+    { id: "b4", name: "GitHub", url: "https://github.com", },
+    { id: "b5", name: "淘宝", url: "https://www.taobao.com", },
+    { id: "b6", name: "网易云音乐", url: "https://music.163.com", },
+  ]
 }
 
 ///|

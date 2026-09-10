@@ -41,6 +41,8 @@ pub fn parse_netscape(String) -> ParseResult?
 
 pub fn remaining_days(String, String) -> Int?
 
+pub fn starter_bookmarks() -> Array[Bookmark]
+
 pub fn str_field(Map[String, Json], String, @json.JsonPath) -> String raise @json.JsonDecodeError
 
 pub fn str_field_opt(Map[String, Json], String) -> String?

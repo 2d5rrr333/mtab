@@ -26,6 +26,21 @@ check('init default config', r.state.config.version === 2 && r.state.config.grou
 check('init clock lunar', r.state.clock.lunar === '乙巳年正月初一', r.state.clock);
 check('init clock weekday', r.state.clock.weekday === '星期三', r.state.clock);
 
+// -- starter presets (starter-presets-and-clock) --
+check('default config ships starter bookmarks',
+  r.state.config.groups[0].bookmarks.length >= 6,
+  r.state.config.groups[0].bookmarks.map(b => b.name));
+// reset to an empty baseline so the rest of the suite keeps its
+// empty-start assumptions (bookmark counts, import top-level, ...)
+{
+  const cfg = JSON.parse(JSON.stringify(r.state.config));
+  cfg.groups = [];
+  cfg.countdowns = [];
+  r = JSON.parse(mtab.mtab_dispatch(
+    JSON.stringify({ type: 'config_import', json: JSON.stringify(cfg) }),
+  ));
+}
+
 // -- bookmark add --
 r = JSON.parse(mtab.mtab_dispatch('{"type":"bookmark_add","name":"示例","url":"example.com"}'));
 check('add normalizes url', r.state.config.groups[0].bookmarks[0].url === 'https://example.com', r.state.config.groups[0]);
@@ -214,6 +229,15 @@ check('tick_date off term day clears it', r5.state.clock.solar_term === undefine
 const modI = new WebAssembly.Module(bytes, { builtins: ['js-string'] });
 const mtabI = new WebAssembly.Instance(modI, { _: imports._ }).exports;
 let ri = JSON.parse(mtabI.mtab_init('', '2025-01-29'));
+// empty baseline: the default config now ships starter bookmarks
+{
+  const cfg = JSON.parse(JSON.stringify(ri.state.config));
+  cfg.groups = [];
+  cfg.countdowns = [];
+  ri = JSON.parse(mtabI.mtab_dispatch(
+    JSON.stringify({ type: 'config_import', json: JSON.stringify(cfg) }),
+  ));
+}
 ri = JSON.parse(mtabI.mtab_dispatch('{"type":"group_add","name":"工作"}'));
 const bmHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <DL><p>

@@ -8,6 +8,14 @@ fn import_html(groups_and_links : String) -> String {
 }
 
 ///|
+/// A store with an explicitly empty default group (the shipped default
+/// config carries starter bookmarks; import tests need a blank grid).
+fn empty_import_store(today : String) -> @store.Store {
+  let cfg = { ..@model.Config::default(), groups: [], }
+  @store.open(Some(cfg.encode()), today).state
+}
+
+///|
 test "bookmark_import event decodes from bridge JSON (task 2.1)" {
   let json = @json.parse(
     "{\"type\":\"bookmark_import\",\"html\":\"<!DOCTYPE NETSCAPE-Bookmark-file-1>\"}",
@@ -41,7 +49,7 @@ test "import merges into same-name group instead of creating one" {
 
 ///|
 test "import dedupes urls against existing and in-batch entries" {
-  let base = @store.open(None, "2025-01-29").state
+  let base = empty_import_store("2025-01-29")
   let with_bm = @store.update(
       base,
       BookmarkAdd(name="已有", url="https://dup.example/", group=None),
@@ -82,7 +90,7 @@ test "import appends new groups after existing ones (order kept)" {
 
 ///|
 test "import top-level bookmarks land in the default group" {
-  let base = @store.open(None, "2025-01-29").state
+  let base = empty_import_store("2025-01-29")
   let html = import_html("  <DT><A HREF=\"https://top.example/\">顶层</A>\n")
   let resp = @store.update(base, BookmarkImport(html~))
   let groups = resp.state.config.groups
@@ -119,7 +127,7 @@ test "import with nothing importable reports and does not save" {
 ///|
 test "import caps total bookmarks and counts overflow as skipped" {
   // build a store holding IMPORT_BOOKMARK_LIMIT - 1 bookmarks via import
-  let base = @store.open(None, "2025-01-29").state
+  let base = empty_import_store("2025-01-29")
   let mut entries = ""
   for i in 0..<(IMPORT_BOOKMARK_LIMIT - 1) {
     entries = entries +

@@ -2,7 +2,8 @@
 
 ///|
 fn gbase() -> @store.Store {
-  @store.open(None, "2025-01-29").state
+  // empty default group: the shipped default config carries starter bookmarks
+  empty_store("2025-01-29")
 }
 
 ///|

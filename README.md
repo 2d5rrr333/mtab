@@ -12,7 +12,7 @@
 | 功能 | 说明 |
 |---|---|
 | 时钟小组件 | 公历日期时间 + 农历 + 干支/星期（1900–2100，纯 MoonBit 换算）+ 24 节气天文历算 + 节日徽章 |
-| 书签网格 | 增删改、favicon 图标 + 首字回退、新标签打开；分组管理与指针拖拽排序、分组折叠记忆 |
+| 书签网格 | 增删改、favicon 图标 + 首字回退、新标签打开；分组管理与指针拖拽排序、分组折叠记忆；首次使用预置常用站点 |
 | 书签导入 | 浏览器导出的 Netscape 书签 HTML（Chrome/Edge/Firefox）一键导入：容错解析、实体还原、同名分组合并、URL 去重 |
 | 倒数日小组件 | 自定义目标日（生日/考试/纪念日），显示剩余天数（还有 N 天 / 就是今天 / 已过 N 天）；跨年闰年按真实日历计算，跨日自动刷新 |
 | 多引擎搜索 | 百度 / Bing / Google 一键切换，回车当前页跳转；历史联想（trie + 半衰期评分）+ 拼音联想（全拼/首字母） |
@@ -64,9 +64,9 @@ npx serve web               # 或 python -m http.server 8000 -d web
 
 | 层 | 命令 | 覆盖 |
 |---|---|---|
-| 单元测试 | `moon test` | store 事件归约、Netscape 书签解析、倒数日日期运算、模型 JSON 往返、URL 归一化、农历换算（含闰月、春节边界）—— 156 项 |
-| e2e | `node e2e.mjs` | 真实 wasm 实例过 FFI 桥逐事件断言 —— 67 项 |
-| headless | `node headless.cjs` | Edge headless 双运行（正常 + `--force-prefers-reduced-motion`）：渲染检查、交互/样式断言、书签导入与倒数日流程 —— 125 + 127 项（需 Windows + Edge） |
+| 单元测试 | `moon test` | store 事件归约、Netscape 书签解析、倒数日日期运算、模型 JSON 往返、URL 归一化、农历换算（含闰月、春节边界）—— 158 项 |
+| e2e | `node e2e.mjs` | 真实 wasm 实例过 FFI 桥逐事件断言 —— 62 项 |
+| headless | `node headless.cjs` | Edge headless 双运行（正常 + `--force-prefers-reduced-motion`）：渲染检查 13 项 + 交互/样式断言 —— 127 + 129 项（需 Windows + Edge） |
 
 GitHub Actions（`.github/workflows/ci.yml`）在每次 push / PR 上执行
 `moon check` → `moon fmt --check` → `moon test` → `build.ps1 -Release` → `node e2e.mjs`，并上传可部署的 `web/` 产物。

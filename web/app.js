@@ -248,8 +248,9 @@ function renderClock() {
 function updateClockTime() {
   const d = new Date();
   const p = n => String(n).padStart(2, '0');
+  // starter-presets-and-clock: hour:minute only (seconds dropped from the display)
   document.getElementById('clock-time').textContent =
-    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    `${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 // search: only the engine bar is state-driven; the input is never re-rendered
