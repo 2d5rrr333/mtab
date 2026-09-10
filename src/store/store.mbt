@@ -142,6 +142,34 @@ fn handle(store : Store, event : Event) -> (Store, Array[Effect]) {
           None => (store, [NotifyError(message="要移动的书签不存在")])
         }
       }
+    BookmarkImport(html~) =>
+      // parse first; failures leave the store untouched (spec: reject)
+      match @model.parse_netscape(html) {
+        None =>
+          (
+            store,
+            [
+              NotifyError(
+                message="导入失败：不是有效的浏览器书签文件",
+              ),
+            ],
+          )
+        Some(parsed) => {
+          let (groups, stats) = merge_import(store.config.groups, parsed)
+          let next = {
+            ..store,
+            config: {
+              ..store.config,
+              groups: @model.ensure_groups_valid(groups),
+            },
+          }
+          if stats.added_bookmarks == 0 && stats.added_groups == 0 {
+            (store, [Toast(message=import_toast_message(stats))])
+          } else {
+            (next, [Save, Toast(message=import_toast_message(stats))])
+          }
+        }
+      }
     GroupAdd(name~) => {
       let trimmed = name.trim().to_owned()
       if trimmed == "" {

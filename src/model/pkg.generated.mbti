@@ -11,9 +11,13 @@ pub const CONFIG_VERSION : Int = 2
 
 pub const DEFAULT_GROUP_ID : String = "g0"
 
+pub const NETSCAPE_MAX_HTML : Int = 5242880
+
 pub const WALLPAPER_BLUR_MAX : Int = 20
 
 pub fn bool_field_opt(Map[String, Json], String) -> Bool
+
+pub fn decode_entities(String) -> String
 
 pub fn ensure_groups_valid(Array[Group]) -> Array[Group]
 
@@ -30,6 +34,8 @@ pub fn next_group_id(Array[Group]) -> String
 pub fn normalize_url(String) -> String?
 
 pub fn number_field_opt(Map[String, Json], String) -> Int64?
+
+pub fn parse_netscape(String) -> ParseResult?
 
 pub fn str_field(Map[String, Json], String, @json.JsonPath) -> String raise @json.JsonDecodeError
 
@@ -86,6 +92,21 @@ pub(all) struct HistoryEntry {
 pub fn HistoryEntry::score(Self, now_ms~ : Int64) -> Double
 pub impl ToJson for HistoryEntry
 pub impl @json.FromJson for HistoryEntry
+
+pub(all) struct ParseResult {
+  top : Array[ParsedBookmark]
+  groups : Array[ParsedGroup]
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ParsedBookmark {
+  name : String
+  url : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ParsedGroup {
+  name : String
+  bookmarks : Array[ParsedBookmark]
+} derive(Eq, @debug.Debug)
 
 pub(all) struct SearchConfig {
   engines : Array[Engine]

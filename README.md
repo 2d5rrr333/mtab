@@ -3,7 +3,7 @@
 [![CI](https://github.com/2d5rrr333/mtab/actions/workflows/ci.yml/badge.svg)](https://github.com/2d5rrr333/mtab/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-一个 iTab 风格的浏览器起始页：**全部业务逻辑——状态机、事件归约、农历换算、配置模型与 JSON 编解码——由 MoonBit 编译为 wasm-gc 承担**，HTML/CSS/JS 只是约 450 行的轻渲染壳。零后端、零第三方依赖，数据全部保存在 localStorage，离线可用。
+一个 iTab 风格的浏览器起始页：**全部业务逻辑——状态机、事件归约、农历换算、书签文件解析、检索评分、配置模型与 JSON 编解码——由 MoonBit 编译为 wasm-gc 承担**，HTML/CSS/JS 只是约 1,000 行的轻渲染壳。零后端、零第三方依赖，数据全部保存在 localStorage，离线可用。
 
 ![screenshot](docs/screenshot.png)
 
@@ -11,11 +11,12 @@
 
 | 功能 | 说明 |
 |---|---|
-| 时钟小组件 | 公历日期时间 + 农历 + 干支/星期（1900–2100，纯 MoonBit 换算） |
-| 书签网格 | 增删改、favicon 图标 + 首字回退、新标签打开 |
-| 多引擎搜索 | 百度 / Bing / Google 一键切换，回车当前页跳转 |
+| 时钟小组件 | 公历日期时间 + 农历 + 干支/星期（1900–2100，纯 MoonBit 换算）+ 24 节气天文历算 + 节日徽章 |
+| 书签网格 | 增删改、favicon 图标 + 首字回退、新标签打开；分组管理与指针拖拽排序、分组折叠记忆 |
+| 书签导入 | 浏览器导出的 Netscape 书签 HTML（Chrome/Edge/Firefox）一键导入：容错解析、实体还原、同名分组合并、URL 去重 |
+| 多引擎搜索 | 百度 / Bing / Google 一键切换，回车当前页跳转；历史联想（trie + 半衰期评分）+ 拼音联想（全拼/首字母） |
 | 壁纸 | 4 张内置 SVG + 本地上传（长边 1920px 压缩、JPEG 80%）；双层层叠 crossfade 淡入（先解码后淡入，避免大图硬弹） |
-| 个性化 | 小组件显隐开关；全部配置 localStorage 持久化；离线可用 |
+| 个性化 | 小组件显隐开关；深/浅/自动主题令牌；壁纸模糊度；全部配置 localStorage 持久化；离线可用 |
 | 配置迁移 | 一键导出/导入 JSON，自定义壁纸以图像数据内嵌，文件自足可迁移 |
 | 无障碍与呈现 | `prefers-reduced-motion` 全局动效关停、键盘 `focus-visible` 轮廓、跨平台中文字体回退链、SVG favicon |
 
@@ -23,14 +24,14 @@
 
 ```
 ┌─────────────────────────── 浏览器 ────────────────────────────┐
-│  index.html · style.css        app.js（渲染壳，~450 行）       │
+│  index.html · style.css       app.js（渲染壳，~1,000 行）      │
 │      ▲ 按分区重绘                  │ 事件 JSON / 响应 JSON     │
 │      │                            ▼                           │
 │   DOM 事件 ────────▶ wasm.mtab_dispatch ────▶ MoonBit store   │
 │                        (wasm-gc)          （唯一的决策点）     │
 │                                              │ effects        │
 │  localStorage ◀── save ──────────────────────┘ open_url /     │
-│                                     notify_error 由渲染壳执行  │
+│                              toast / notify_error 由渲染壳执行 │
 └────────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,9 +63,9 @@ npx serve web               # 或 python -m http.server 8000 -d web
 
 | 层 | 命令 | 覆盖 |
 |---|---|---|
-| 单元测试 | `moon test` | store 事件归约、模型 JSON 往返、URL 归一化、农历换算（含闰月、春节边界）—— 37 项 |
-| e2e | `node e2e.mjs` | 真实 wasm 实例过 FFI 桥逐事件断言 —— 18 项 |
-| headless | `node headless.cjs` | Edge headless：13 项渲染检查 + 63 项交互/样式断言，并以 `--force-prefers-reduced-motion` 复跑 65 项验证动效关停（需 Windows + Edge） |
+| 单元测试 | `moon test` | store 事件归约、Netscape 书签解析、模型 JSON 往返、URL 归一化、农历换算（含闰月、春节边界）—— 140 项 |
+| e2e | `node e2e.mjs` | 真实 wasm 实例过 FFI 桥逐事件断言 —— 51 项 |
+| headless | `node headless.cjs` | Edge headless 双运行（正常 + `--force-prefers-reduced-motion`）：渲染检查、交互/样式断言、书签导入流程等 —— 114 + 116 项（需 Windows + Edge） |
 
 GitHub Actions（`.github/workflows/ci.yml`）在每次 push / PR 上执行
 `moon check` → `moon fmt --check` → `moon test` → `build.ps1 -Release` → `node e2e.mjs`，并上传可部署的 `web/` 产物。
@@ -76,9 +77,11 @@ GitHub Actions（`.github/workflows/ci.yml`）在每次 push / PR 上执行
 ├── build.ps1             # wasm 编译 + 产物暂存（跨平台）
 ├── src/
 │   ├── main/             # wasm 导出：mtab_init / mtab_dispatch
-│   ├── store/            # 状态树、事件归约、副作用队列
-│   ├── model/            # 配置/书签/引擎/壁纸模型 + JSON 编解码
-│   └── lunar/            # 公历↔农历换算（1900–2100）
+│   ├── store/            # 状态树、事件归约、副作用队列、导入归并
+│   ├── model/            # 配置/书签/引擎/壁纸模型、JSON 编解码、Netscape 解析
+│   ├── pinyin/           # 无声调拼音表（~2000 常用字）
+│   ├── trie/             # 字符前缀 trie（历史联想检索）
+│   └── lunar/            # 公历↔农历换算、节气天文历算（1900–2100）
 ├── web/                  # 渲染壳：index.html · style.css · app.js · 壁纸 · favicon
 ├── e2e.mjs               # FFI 桥 e2e（Node）
 ├── headless.cjs          # Edge headless 渲染/交互验证

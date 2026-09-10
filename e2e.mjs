@@ -208,6 +208,51 @@ check(
 const r5 = JSON.parse(mtab4.mtab_dispatch('{"type":"tick_date","date":"2025-10-07"}'));
 check('tick_date off term day clears it', r5.state.clock.solar_term === undefined, r5.state.clock);
 
+// -- bookmark import (bookmark-import change) --
+// fresh instance so the section owns its whole config (pitfall: config_import
+// replaces everything; the sections before/after are unaffected anyway)
+const modI = new WebAssembly.Module(bytes, { builtins: ['js-string'] });
+const mtabI = new WebAssembly.Instance(modI, { _: imports._ }).exports;
+let ri = JSON.parse(mtabI.mtab_init('', '2025-01-29'));
+ri = JSON.parse(mtabI.mtab_dispatch('{"type":"group_add","name":"工作"}'));
+const bmHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><H3>工作</H3>
+    <DL><p>
+        <DT><A HREF="https://e2e.example/?a=1&amp;b=2">重复项</A>
+        <DT><A HREF="nested.example.com">嵌套</A>
+    </DL><p>
+    <DT><A HREF="https://top.example/">顶层</A>
+</DL><p>`;
+ri = JSON.parse(mtabI.mtab_dispatch(`{"type":"bookmark_import","html":${JSON.stringify(bmHtml)}}`));
+check('import merges into same-name group',
+  ri.state.config.groups.length === 2 &&
+    ri.state.config.groups[1].name === '工作' &&
+    ri.state.config.groups[1].bookmarks.length === 2 &&
+    ri.state.config.groups[1].bookmarks[0].url === 'https://e2e.example/?a=1&b=2' &&
+    ri.state.config.groups[1].bookmarks[1].url === 'https://nested.example.com',
+  ri.state.config.groups);
+check('import top-level lands in default group',
+  ri.state.config.groups[0].bookmarks.map(b => b.url).join(',') === 'https://top.example/',
+  ri.state.config.groups[0]);
+check('import saves and toasts',
+  ri.effects[0].type === 'save' && ri.effects[1].type === 'toast' &&
+    ri.effects[1].message === '导入完成：新增 0 组 3 条书签',
+  ri.effects);
+// re-import: all three urls dedupe, no save, report skipped
+ri = JSON.parse(mtabI.mtab_dispatch(`{"type":"bookmark_import","html":${JSON.stringify(bmHtml)}}`));
+check('re-import dedupes without saving',
+  ri.effects.length === 1 && ri.effects[0].type === 'toast' &&
+    ri.effects[0].message === '未导入新内容：跳过 3 条重复或无效书签',
+  ri.effects);
+// invalid file: state kept, notify_error
+const beforeBad = JSON.stringify(ri.state.config);
+ri = JSON.parse(mtabI.mtab_dispatch('{"type":"bookmark_import","html":"<html><body>nope</body></html>"}'));
+check('invalid bookmark file notifies and keeps state',
+  ri.effects[0].type === 'notify_error' &&
+    JSON.stringify(ri.state.config) === beforeBad,
+  ri.effects);
+
 // -- unknown event --
 r = JSON.parse(mtab.mtab_dispatch('{"type":"nope"}'));
 check('unknown event notifies', r.effects[0].type === 'notify_error', r.effects);

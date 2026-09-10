@@ -127,6 +127,10 @@ function runEffects(effects) {
       case 'notify_error':
         toast(eff.message);
         break;
+      case 'toast':
+        // bridge reports (bookmark-import design D4): informational, not errors
+        toast(eff.message, 'success');
+        break;
     }
   }
 }
@@ -820,6 +824,16 @@ function importConfig(file) {
   reader.readAsText(file);
 }
 
+// ---- bookmark file import (bookmark-import design D3) ----
+// shell only reads the file and forwards the text; parsing and merge
+// decisions all live in wasm.
+
+function importBookmarks(file) {
+  const reader = new FileReader();
+  reader.onload = () => dispatch({ type: 'bookmark_import', html: String(reader.result) });
+  reader.readAsText(file);
+}
+
 // ---- wiring ----
 
 function wireEvents() {
@@ -1025,6 +1039,13 @@ function wireEvents() {
     e.target.value = '';
     if (file) {
       importConfig(file);
+    }
+  });
+  document.getElementById('bookmark-import').addEventListener('change', e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (file) {
+      importBookmarks(file);
     }
   });
 }

@@ -87,6 +87,9 @@
           <label class="btn-like">导入 JSON
             <input type="file" id="config-import" accept="application/json,.json">
           </label>
+          <label class="btn-like">导入书签 HTML
+            <input type="file" id="bookmark-import" accept="text/html,.html,.htm">
+          </label>
           <button type="button" id="history-clear">清空搜索历史</button>
         </div>
       </section>
@@ -793,6 +796,67 @@
       (activeWallpaper() && activeWallpaper().style.backgroundImage) === beforeBg &&
       !$('toast').hidden && !$('toast').classList.contains('success'),
       $('toast').textContent);
+
+    // -- bookmark html import through the real file input (bookmark-import) --
+    // settings modal carries the dedicated entry
+    $('settings-open').click();
+    check('bookmark import entry present in settings',
+      !!$('bookmark-import') && $('bookmark-import').tagName === 'INPUT');
+    $('settings-close').click();
+    const bmHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><H3 PERSONAL_TOOLBAR_FOLDER="true">导入组 &amp; 测试</H3>
+    <DL><p>
+        <DT><A HREF="https://imported.example.com/?a=1&amp;b=2">导入书签</A>
+        <DT><A HREF="plain-import.example.com">无协议</A>
+    </DL><p>
+    <DT><A HREF="https://top-level.example/">顶层书签</A>
+</DL><p>`;
+    const bmFile = new File([bmHtml], 'bookmarks.html', { type: 'text/html' });
+    const dt5 = new DataTransfer();
+    dt5.items.add(bmFile);
+    $('toast').hidden = true;
+    $('bookmark-import').files = dt5.files;
+    $('bookmark-import').dispatchEvent(new Event('change'));
+    await until(() => window.mtab.config.groups.some(g => g.name === '导入组 & 测试'));
+    check('import toast reports groups and bookmarks (success variant)',
+      $('toast').classList.contains('success') &&
+        /新增 1 组 3 条书签/.test($('toast').textContent),
+      $('toast').textContent);
+    const importGroups = window.mtab.config.groups;
+    check('import created the named group with normalized urls',
+      importGroups.some(g => g.name === '导入组 & 测试' &&
+        g.bookmarks.some(b => b.url === 'https://imported.example.com/?a=1&b=2') &&
+        g.bookmarks.some(b => b.url === 'https://plain-import.example.com')) &&
+      importGroups[0].bookmarks.some(b => b.url === 'https://top-level.example/'),
+      importGroups);
+    check('import persisted to localStorage',
+      JSON.parse(localStorage.getItem('mtab.config')).groups.some(g => g.name === '导入组 & 测试'));
+    // re-importing the same file: everything dedupes, no save
+    const stateAfterFirst = JSON.stringify(window.mtab.config);
+    $('toast').hidden = true;
+    const dt6 = new DataTransfer();
+    dt6.items.add(new File([bmHtml], 'bookmarks.html', { type: 'text/html' }));
+    $('bookmark-import').files = dt6.files;
+    $('bookmark-import').dispatchEvent(new Event('change'));
+    await until(() => !$('toast').hidden);
+    check('re-import dedupes and reports skipped',
+      /未导入新内容：跳过 3 条/.test($('toast').textContent),
+      $('toast').textContent);
+    check('re-import changed nothing', JSON.stringify(window.mtab.config) === stateAfterFirst);
+    // invalid html: state kept, error toast
+    $('toast').hidden = true;
+    const dt7 = new DataTransfer();
+    dt7.items.add(new File(['<html><body>nope</body></html>'], 'x.html', { type: 'text/html' }));
+    $('bookmark-import').files = dt7.files;
+    $('bookmark-import').dispatchEvent(new Event('change'));
+    await until(() => !$('toast').hidden);
+    check('invalid bookmark file rejected with error toast',
+      !$('toast').classList.contains('success') &&
+        /导入失败/.test($('toast').textContent),
+      $('toast').textContent);
+    check('invalid bookmark file keeps config',
+      JSON.stringify(window.mtab.config) === stateAfterFirst);
 
     // -- import through the real file input --
     // v1-shaped file (flat bookmarks) exercises the migration path
