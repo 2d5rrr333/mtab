@@ -22,4 +22,4 @@
 ## 3. 文档与收尾
 
 - [x] 3.1 mtab README：测试段注明工具来自 `2d5rrr333/moonwebtest`（三层策略表）；AGENTS.md 验证基线与生态包上下文同步
-- [ ] 3.2 openspec validate extract-moonwebtest 通过；与 extract-moonbridge 一并归档（复审材料交付前）
+- [x] 3.2 openspec validate extract-moonwebtest 通过；归档（2026-09-12，与 extract-moonbridge 一并交付）

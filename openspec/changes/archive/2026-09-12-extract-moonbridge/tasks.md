@@ -20,4 +20,4 @@
 ## 3. 文档与收尾
 
 - [x] 3.1 mtab README：开头与架构段注明桥协议层来自 `2d5rrr333/moonbridge`（生态位反转叙事：mtab 是参考应用）、项目结构补 vendor；moon.mod version → 0.5.0
-- [ ] 3.2 openspec validate extract-moonbridge 通过；归档时机随复审材料整体交付（见 proposal：另一 change 完成后一并 archive）
+- [x] 3.2 openspec validate extract-moonbridge 通过；归档（2026-09-12，随复审材料整体交付）
