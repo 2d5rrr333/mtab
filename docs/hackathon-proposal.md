@@ -3,7 +3,7 @@
 ## 基本信息
 
 - 项目名称：mtab 生态——moonbridge 前端桥协议包 + moonwebtest 测试工具链包 + mtab 参考应用
-- 主仓库：https://github.com/2d5rrr333/mtab（50 个有效提交，全部在本赛期内）
+- 主仓库：https://github.com/2d5rrr333/mtab（51 个有效提交，全部在本赛期内）
 - 生态包仓库：https://github.com/2d5rrr333/moonbridge、https://github.com/2d5rrr333/moonwebtest
 - mooncakes 发布：`2d5rrr333/moonbridge@0.1.0`、`2d5rrr333/moonwebtest@0.1.0`、`2d5rrr333/mtab@0.5.0`（三个模块均可 `moon add` 直接使用）
 - 项目性质：原创；农历换算算法移植自 solarlunar 3.1.0（MIT，修改点已在 README 与源码注明）；moonbridge/moonwebtest 全部原创，零第三方依赖
