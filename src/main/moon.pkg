@@ -1,9 +1,11 @@
 // mtab wasm FFI surface (design D1/D2): the only package in the web artifact.
 //
-// Exports mtab_init/mtab_dispatch over the bridge. JS passes/stores config
-// JSON text; responses are the Response envelope (state + effects).
+// Exports mtab_init/mtab_dispatch over the moonbridge Session. JS
+// passes/stores config JSON text; responses are the state+effects
+// envelope. All protocol mechanics live in 2d5rrr333/moonbridge.
 
 import {
+  "2d5rrr333/moonbridge/bridge",
   "2d5rrr333/mtab/store",
   "moonbitlang/core/json",
 }

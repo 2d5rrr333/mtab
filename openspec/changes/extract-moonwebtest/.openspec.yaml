@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-09-12
+skip_specs: true
+skip_specs_reason: 纯测试基建：测试工具从 mtab 内嵌脚本泛化为独立模块，被测对象（mtab 桥协议行为）不变，5 个 capability 的可观测行为不变。

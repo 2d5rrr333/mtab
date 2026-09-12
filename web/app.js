@@ -1,8 +1,12 @@
-// mtab JS bridge and rendering shell (design D1/D2/D5).
+// mtab rendering shell over the moonbridge runtime (design D1/D2/D5).
 //
 // Responsibilities: collect events -> wasm dispatch -> redraw affected
-// partitions -> execute effects (save/open_url/notify_error). The wasm side
-// owns all business logic; this file never decides anything the store can.
+// partitions -> execute effects (save/open_url/toast/notify_error). The wasm
+// side owns all business logic; this file never decides anything the store
+// can. Protocol mechanics (wasm loading, dispatch loop, effect dispatch)
+// live in vendor/moonbridge.mjs (github.com/2d5rrr333/moonbridge).
+
+import { bootBridge } from './vendor/moonbridge.mjs';
 
 const STORAGE_KEY = 'mtab.config';
 const WALLPAPERS = ['w1', 'w2', 'w3', 'w4'];
@@ -50,24 +54,8 @@ function openTermModal(name) {
   document.getElementById('term-modal-close').focus();
 }
 
-/** Load the wasm-gc module with JS string builtins (task 1.2 spike result). */
-async function loadWasm() {
-  const bytes = await (await fetch('wasm/main.wasm')).arrayBuffer();
-  const mod = new WebAssembly.Module(bytes, { builtins: ['js-string'] });
-  // String literals arrive as imported globals under module "_" whose name
-  // is the literal content. Materialize them by hand: engine-independent.
-  const imports = { _: {} };
-  for (const imp of WebAssembly.Module.imports(mod)) {
-    if (imp.module === '_' && imp.kind === 'global') {
-      imports._[imp.name] = imp.name;
-    }
-  }
-  return new WebAssembly.Instance(mod, imports).exports;
-}
-
 // ---- state ----
 
-const wasm = await loadWasm();
 let config = null; // current state.config
 let clockView = null; // current state.clock
 let suggestions = []; // current state.suggestions (transient view)
@@ -80,13 +68,12 @@ function todayStr() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-function apply(response) {
-  config = response.state.config;
-  clockView = response.state.clock;
-  countdownViews = response.state.countdown_views || [];
+function applyState(state) {
+  config = state.config;
+  clockView = state.clock;
+  countdownViews = state.countdown_views || [];
   const prevSuggestions = suggestions;
-  suggestions = response.state.suggestions || [];
-  runEffects(response.effects);
+  suggestions = state.suggestions || [];
   renderAll();
   // the suggestion dropdown is its own partition: re-render only when the
   // suggestion list actually changed (bookmark events must not touch it)
@@ -107,35 +94,9 @@ function suggestionsChanged(a, b) {
   return false;
 }
 
-function dispatch(event) {
-  apply(JSON.parse(wasm.mtab_dispatch(JSON.stringify(event))));
-}
-
-// ---- effects (design D2) ----
-
-function runEffects(effects) {
-  for (const eff of effects) {
-    switch (eff.type) {
-      case 'save':
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-        } catch (e) {
-          toast('保存失败：本地存储空间不足');
-        }
-        break;
-      case 'open_url':
-        window.location.href = eff.url; // search-box spec: current tab
-        break;
-      case 'notify_error':
-        toast(eff.message);
-        break;
-      case 'toast':
-        // bridge reports (bookmark-import design D4): informational, not errors
-        toast(eff.message, 'success');
-        break;
-    }
-  }
-}
+// ---- effects (design D2): executed by the moonbridge runtime ----
+// save persists the current state (ctx.state is the envelope's state,
+// already updated); the rest are presentation effects.
 
 let toastTimer = null;
 function toast(message, type = 'error') {
@@ -1163,9 +1124,34 @@ function startClock() {
 
 buildWallpaperList();
 wireEvents();
-apply(
-  JSON.parse(wasm.mtab_init(localStorage.getItem(STORAGE_KEY) || '', todayStr())),
-);
+// boot the bridge: init runs through the same apply path as dispatch
+const app = await bootBridge({
+  wasmUrl: 'wasm/main.wasm',
+  init: 'mtab_init',
+  dispatch: 'mtab_dispatch',
+  initArgs: () => [localStorage.getItem(STORAGE_KEY) || '', todayStr()],
+  onState: applyState,
+  effects: {
+    save: (_eff, ctx) => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(ctx.state.config));
+      } catch (e) {
+        toast('保存失败：本地存储空间不足');
+      }
+    },
+    open_url: eff => {
+      window.location.href = eff.url; // search-box spec: current tab
+    },
+    notify_error: eff => toast(eff.message),
+    // bridge reports (bookmark-import design D4): informational, not errors
+    toast: eff => toast(eff.message, 'success'),
+  },
+});
+
+function dispatch(event) {
+  app.dispatch(event);
+}
+
 startClock();
 document.getElementById('search-input').focus(); // search-box spec: autofocus
 

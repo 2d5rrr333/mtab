@@ -17,3 +17,7 @@ source = "src"
 preferred_target = "wasm-gc"
 
 description = "MoonBit-powered browser start page: clock with lunar calendar, bookmark grid, multi-engine search, wallpapers — all core logic in MoonBit (wasm-gc), DOM as a thin shell."
+
+import {
+  "2d5rrr333/moonbridge@0.1.0",
+}

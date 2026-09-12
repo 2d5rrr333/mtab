@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-09-12
+skip_specs: true
+skip_specs_reason: 纯基建重构：桥协议行为（init/dispatch 信封、错误路径）保持逐字节不变，仅把实现从 mtab 抽到独立模块，5 个 capability 的可观测行为不变。
