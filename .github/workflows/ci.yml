@@ -25,6 +25,11 @@ jobs:
       - name: Toolchain version
         run: moon version --all
 
+      - name: Update registry index
+        # moon.mod now depends on 2d5rrr333/moonbridge and moonwebtest; a
+        # fresh toolchain ships without the registry index.
+        run: moon update
+
       - name: Check
         run: moon check
 
