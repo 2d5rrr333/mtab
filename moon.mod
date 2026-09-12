@@ -20,4 +20,5 @@ description = "MoonBit-powered browser start page: clock with lunar calendar, bo
 
 import {
   "2d5rrr333/moonbridge@0.1.0",
+  "2d5rrr333/moonwebtest@0.1.0",
 }

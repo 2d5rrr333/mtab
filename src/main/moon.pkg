@@ -10,6 +10,10 @@ import {
   "moonbitlang/core/json",
 }
 
+import {
+  "2d5rrr333/moonwebtest/check",
+} for "test"
+
 pkgtype(kind: "foreign_library")
 
 options(

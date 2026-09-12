@@ -67,9 +67,9 @@ npx serve web               # 或 python -m http.server 8000 -d web
 
 | 层 | 命令 | 覆盖 |
 |---|---|---|
-| 单元测试 | `moon test` | store 事件归约、Netscape 书签解析、倒数日日期运算、模型 JSON 往返、URL 归一化、农历换算（含闰月、春节边界）—— 158 项 |
-| e2e | `node e2e.mjs` | 真实 wasm 实例过 FFI 桥逐事件断言 —— 62 项 |
-| headless | `node headless.cjs` | Edge headless 双运行（正常 + `--force-prefers-reduced-motion`）：渲染检查 13 项 + 交互/样式断言 —— 127 + 129 项（需 Windows + Edge） |
+| 单元测试 | `moon test` | store 事件归约、Netscape 书签解析、倒数日日期运算、模型 JSON 往返、URL 归一化、农历换算（含闰月、春节边界）、桥协议 wire format（@moonwebtest/check）—— 162 项 |
+| e2e | `node e2e.mjs` | 真实 wasm 实例过 FFI 桥逐事件断言（驱动器来自 @moonwebtest bridge-harness，vendored 于 `tools/`）—— 63 项 |
+| headless | `node headless.cjs` | Edge headless 双运行（正常 + `--force-prefers-reduced-motion`）：渲染检查 13 项 + 交互/样式断言 —— 127 + 129 项（需 Chromium 系浏览器） |
 
 GitHub Actions（`.github/workflows/ci.yml`）在每次 push / PR 上执行
 `moon check` → `moon fmt --check` → `moon test` → `build.ps1 -Release` → `node e2e.mjs`，并上传可部署的 `web/` 产物。
@@ -87,8 +87,9 @@ GitHub Actions（`.github/workflows/ci.yml`）在每次 push / PR 上执行
 │   ├── trie/             # 字符前缀 trie（历史联想检索）
 │   └── lunar/            # 公历↔农历换算、节气天文历算（1900–2100）
 ├── web/                  # 渲染壳：index.html · style.css · app.js · vendor/moonbridge.mjs · 壁纸 · favicon
-├── e2e.mjs               # FFI 桥 e2e（Node）
-├── headless.cjs          # Edge headless 渲染/交互验证
+├── e2e.mjs               # FFI 桥 e2e（Node，驱动器为 moonwebtest bridge-harness）
+├── headless.cjs          # headless 渲染/交互验证（运行时为 moonwebtest headless runner）
+├── tools/                # vendored 测试工具链（github.com/2d5rrr333/moonwebtest）
 └── openspec/             # 行为规格（4 个 capability）与变更档案
 ```
 

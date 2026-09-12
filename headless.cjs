@@ -1,114 +1,43 @@
-// Headless browser harness: serves web/ and checks rendering via Edge
-// headless --dump-dom. Two phases:
+// Headless browser harness: serves web/ and checks rendering via a
+// headless Chromium-family browser --dump-dom. Two phases:
 //   1. index.html render checks
 //   2. test-harness.html interaction checks (results dumped into the DOM)
+// Browser plumbing comes from the moonwebtest headless runner
+// (github.com/2d5rrr333/moonwebtest, vendored under tools/).
 // Usage: node headless.cjs
-const { createServer, get: httpGet } = require('node:http');
-const { readFile } = require('node:fs/promises');
-const { rmSync } = require('node:fs');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { rmSync } = require('node:fs');
+const { get: httpGet } = require('node:http');
+const {
+  serveStatic,
+  runChromium,
+  report,
+} = require('./tools/headless.cjs');
 
 const ROOT = path.join(__dirname, 'web');
-const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const PROFILE_ROOT = path.join(__dirname, '.edge-profile');
 const PORT = 8932;
 
-const types = {
-  '.html': 'text/html',
-  '.js': 'text/javascript',
-  '.mjs': 'text/javascript',
-  '.css': 'text/css',
-  '.wasm': 'application/wasm',
-  '.svg': 'image/svg+xml',
-};
-
-const server = createServer(async (req, res) => {
-  try {
-    const url = new URL(req.url, `http://localhost:${PORT}`);
-    const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
-    const data = await readFile(path.join(ROOT, file));
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    res.end(data);
-  } catch {
-    res.writeHead(404);
-    res.end('not found');
-  }
-});
-
-// Best-effort cleanup of all run profiles at startup. Each runEdge call
-// uses its own unique profile dir instead: a killed Edge can keep the
+// Best-effort cleanup of all run profiles at startup. Each runChromium call
+// uses its own unique profile dir instead: a killed browser can keep the
 // directory lock for a while, which would make a per-run rmSync fail
 // silently and leak localStorage between back-to-back runs.
 try {
-  rmSync(path.join(__dirname, '.edge-profile'), { recursive: true, force: true });
+  rmSync(PROFILE_ROOT, { recursive: true, force: true });
 } catch {}
 
-let runCounter = 0;
-function runEdge(args) {
-  return new Promise((resolve) => {
-    const profile = path.join(__dirname, '.edge-profile', `run-${++runCounter}`);
-    console.log('  [edge] launching:', args.join(' '));
-    const proc = spawn(EdgeExe(), [
-      '--headless=new',
-      '--disable-gpu',
-      '--no-first-run',
-      '--window-size=1280,800',
-      `--user-data-dir=${profile}`,
-      '--virtual-time-budget=60000',
-      ...args,
-    ]);
-    let out = '';
-    let err = '';
-    let done = false;
-    const finish = value => {
-      if (done) {
-        return;
-      }
-      done = true;
-      clearTimeout(timer);
-      try { proc.kill(); } catch {}
-      resolve(value);
-    };
-    proc.stdout.on('data', d => {
-      out += d;
-      // The harness writes its summary into the dumped DOM; once it appears
-      // there is nothing more to wait for (Edge may linger on some systems).
-      if (args.includes('--dump-dom') && out.includes('test-summary')) {
-        console.log('  [edge] summary captured, ending early');
-        finish(out);
-      }
-    });
-    proc.stderr.on('data', d => (err += d));
-    proc.stdout.on('error', () => {});
-    proc.stderr.on('error', () => {});
-    // Hard cap: a hung renderer must not stall the whole run.
-    const timer = setTimeout(() => {
-      console.log('  [edge] TIMEOUT, killing. stderr tail:', err.slice(-400));
-      finish(out);
-    }, 60000);
-    proc.on('close', code => {
-      console.log('  [edge] exited', code);
-      finish(out);
-    });
-    proc.on('error', e => {
-      console.log('  [edge] spawn error', e);
-      finish('');
-    });
+async function runEdge(args) {
+  return runChromium({
+    args,
+    profileRoot: PROFILE_ROOT,
+    waitMarker: args.includes('--dump-dom') ? 'test-summary' : undefined,
+    timeoutMs: 60000,
   });
 }
 
-function EdgeExe() {
-  return EDGE;
-}
-
-function report(name, ok) {
-  console.log((ok ? '  ok: ' : 'FAIL: ') + name);
-  return ok ? 0 : 1;
-}
-
 (async () => {
-  await new Promise(r => server.listen(PORT, r));
-  const base = `http://localhost:${PORT}/`;
+  const site = await serveStatic(ROOT, PORT);
+  const base = site.url;
   let failed = 0;
 
   // favicon reachable with svg content type (ui-a11y-polish D4).
@@ -162,7 +91,7 @@ function report(name, ok) {
   await runEdge(['--screenshot=' + path.join(__dirname, 'headless.png'), '--window-size=1280,800', base]);
   console.log('screenshot: headless.png');
 
-  server.close();
+  await site.close();
   console.log(failed === 0 ? 'HEADLESS CHECKS PASSED' : failed + ' FAILURES');
   process.exit(failed === 0 ? 0 : 1);
 })();
