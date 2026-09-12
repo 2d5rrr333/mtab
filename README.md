@@ -5,6 +5,8 @@
 
 一个 iTab 风格的浏览器起始页：**全部业务逻辑——状态机、事件归约、农历换算、书签文件解析、检索评分、配置模型与 JSON 编解码——由 MoonBit 编译为 wasm-gc 承担**，HTML/CSS/JS 只是约 1,000 行的轻渲染壳。零后端、零第三方依赖，数据全部保存在 localStorage，离线可用。
 
+mtab 是两个生态包的**参考应用**（dogfooding）：桥协议层来自 **[moonbridge](https://github.com/2d5rrr333/moonbridge)**（`moon add 2d5rrr333/moonbridge`，泛型 Session + 浏览器运行时，"wasm 拥有状态、JS 只是薄壳"架构的可复用实现），测试工具链为 **[moonwebtest](https://github.com/2d5rrr333/moonwebtest)**。
+
 ![screenshot](docs/screenshot.png)
 
 ## 功能
@@ -37,6 +39,7 @@
 ```
 
 - **MoonBit 是唯一的决策点**：单一 store 把每个事件归约为「新状态 + 副作用列表」；JS 壳只收集事件、重绘、执行副作用，从不做 store 能做的决定
+- **桥协议层来自 [moonbridge](https://github.com/2d5rrr333/moonbridge)**：`src/main/main.mbt` 只做 Session 组装（约 40 行），信封序列化 / 事件解码兜底 / 错误路径全部由生态包承担；`web/vendor/moonbridge.mjs` 运行时负责 wasm 加载、dispatch 循环与副作用分发
 - **渲染分区**：时钟 / 引擎栏 / 书签网格 / 壁纸各自独立重绘；搜索框永不重绘，焦点与草稿不丢
 - **桥协议**：`mtab_init(stored, today)` 与 `mtab_dispatch(event)` 两个导出，字符串 JSON 往返，未初始化/非法事件返回 `notify_error` 而非崩溃
 
@@ -74,16 +77,16 @@ GitHub Actions（`.github/workflows/ci.yml`）在每次 push / PR 上执行
 ## 项目结构
 
 ```
-├── moon.mod              # 2d5rrr333/mtab 模块定义
+├── moon.mod              # 2d5rrr333/mtab 模块定义（deps: 2d5rrr333/moonbridge）
 ├── build.ps1             # wasm 编译 + 产物暂存（跨平台）
 ├── src/
-│   ├── main/             # wasm 导出：mtab_init / mtab_dispatch
+│   ├── main/             # wasm 导出：mtab_init / mtab_dispatch（Session 组装）
 │   ├── store/            # 状态树、事件归约、副作用队列、导入归并、倒数日视图
 │   ├── model/            # 配置/书签/引擎/壁纸/倒数日模型、JSON 编解码、Netscape 解析
 │   ├── pinyin/           # 无声调拼音表（~2000 常用字）
 │   ├── trie/             # 字符前缀 trie（历史联想检索）
 │   └── lunar/            # 公历↔农历换算、节气天文历算（1900–2100）
-├── web/                  # 渲染壳：index.html · style.css · app.js · 壁纸 · favicon
+├── web/                  # 渲染壳：index.html · style.css · app.js · vendor/moonbridge.mjs · 壁纸 · favicon
 ├── e2e.mjs               # FFI 桥 e2e（Node）
 ├── headless.cjs          # Edge headless 渲染/交互验证
 └── openspec/             # 行为规格（4 个 capability）与变更档案
